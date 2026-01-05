@@ -5,7 +5,13 @@ import argparse
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Union
+
+from shapely import affinity
+from shapely.geometry import LineString, Point, Polygon, MultiPolygon
+from shapely.ops import unary_union
+
+Geom = Union[Polygon, MultiPolygon]
 
 
 # -------------------------
@@ -19,7 +25,7 @@ class Metrics:
     CAP_TOP: float = 40.0
     CAP_W: float = 700.0
     LC_W: float = 600.0
-    XH: float = 520.0  # x-height in units (distance from baseline upwards)
+    XH: float = 520.0  # baseline -> xheight distance
 
     @property
     def CAP_MID(self) -> float:
@@ -27,7 +33,6 @@ class Metrics:
 
     @property
     def X_TOP(self) -> float:
-        # y at top of x-height
         return self.BASE - self.XH
 
     @property
@@ -39,71 +44,137 @@ class Metrics:
         return float(self.H)
 
 
-@dataclass
-class Glyph:
-    width: float
-    # multiple stroked path segments (combined as separate <path> elements)
-    paths: List[str]
-    # filled circles (for dots)
-    circles: List[Tuple[float, float, float]]  # (cx, cy, r)
+# -------------------------
+# Geometry builder (monoline -> outlines)
+# -------------------------
+
+class Mono:
+    def __init__(self, stroke: float, resolution: int = 48):
+        self.stroke = float(stroke)
+        self.r = self.stroke / 2.0
+        self.res = int(resolution)
+
+    def _fix(self, g: Geom) -> Geom:
+        try:
+            gg = g.buffer(0)
+            return gg if not gg.is_empty else g
+        except Exception:
+            return g
+
+    def union(self, *parts: Geom) -> Geom:
+        ps = [p for p in parts if p is not None and not p.is_empty]
+        if not ps:
+            return Polygon()
+        return self._fix(unary_union(ps))
+
+    def line(self, pts: List[Tuple[float, float]]) -> Geom:
+        return self._fix(LineString(pts).buffer(self.r, cap_style=1, join_style=1, resolution=self.res))
+
+    def vline(self, x: float, y0: float, y1: float) -> Geom:
+        return self.line([(x, y0), (x, y1)])
+
+    def hline(self, x0: float, x1: float, y: float) -> Geom:
+        return self.line([(x0, y), (x1, y)])
+
+    def arc(self, cx: float, cy: float, r: float, deg0: float, deg1: float, steps: int = 120) -> Geom:
+        # degrees: 0=right, 90=down (SVG-ish)
+        def pt(deg: float) -> Tuple[float, float]:
+            t = math.radians(deg)
+            return (cx + math.cos(t) * r, cy + math.sin(t) * r)
+
+        # handle wrap
+        d0 = deg0 % 360.0
+        d1 = deg1 % 360.0
+        if d1 <= d0:
+            d1 += 360.0
+        angs = [d0 + (d1 - d0) * (i / (steps - 1)) for i in range(steps)]
+        pts = [pt(a) for a in angs]
+        return self.line(pts)
+
+    def circle_stroke(self, cx: float, cy: float, r: float) -> Geom:
+        # boundary buffered -> monoline circle
+        boundary = Point(cx, cy).buffer(r, resolution=self.res).boundary
+        return self._fix(boundary.buffer(self.r, cap_style=1, join_style=1, resolution=self.res))
+
+    def ellipse_stroke(self, cx: float, cy: float, rx: float, ry: float) -> Geom:
+        base = Point(cx, cy).buffer(1.0, resolution=self.res)
+        ell = affinity.scale(base, xfact=rx, yfact=ry, origin=(cx, cy))
+        boundary = ell.boundary
+        return self._fix(boundary.buffer(self.r, cap_style=1, join_style=1, resolution=self.res))
+
+    def wedge(self, cx: float, cy: float, r_outer: float, deg0: float, deg1: float) -> Polygon:
+        # triangle wedge from center to two rays
+        def pt(deg: float) -> Tuple[float, float]:
+            t = math.radians(deg)
+            return (cx + math.cos(t) * r_outer, cy + math.sin(t) * r_outer)
+        p0 = pt(deg0)
+        p1 = pt(deg1)
+        return Polygon([(cx, cy), p0, p1])
+
+    def sine_spine(self, x_center: float, y0: float, y1: float, amp: float, samples: int = 220) -> List[Tuple[float, float]]:
+        # smoothstep y for flatter endpoints; cosine x for S-like
+        def smoothstep(t: float) -> float:
+            return t * t * (3.0 - 2.0 * t)
+
+        pts: List[Tuple[float, float]] = []
+        for i in range(samples):
+            t = i / (samples - 1)
+            y = y0 + smoothstep(t) * (y1 - y0)
+            x = x_center + amp * math.cos(2.0 * math.pi * t)
+            pts.append((x, y))
+        return pts
 
 
 # -------------------------
-# SVG helpers
+# SVG output (filled outlines)
 # -------------------------
+
+def fmt(x: float) -> str:
+    return f"{x:.3f}"
+
 
 def codepoint_filename(s: str) -> str:
     cps = [f"U{ord(ch):04X}" for ch in s]
     return "_".join(cps) + ".svg"
 
 
-def pt(cx: float, cy: float, r: float, deg: float) -> Tuple[float, float]:
-    # angle deg, 0° = +x, 90° = +y (SVG y-down)
-    t = math.radians(deg)
-    return (cx + r * math.cos(t), cy + r * math.sin(t))
+def geom_to_svg_path(g: Geom) -> str:
+    # y is already SVG-y-down, so no flipping needed.
+    if g.is_empty:
+        return ""
 
+    polys: List[Polygon]
+    if isinstance(g, Polygon):
+        polys = [g]
+    else:
+        polys = [p for p in g.geoms if isinstance(p, Polygon)]
 
-def fmt(x: float) -> str:
-    return f"{x:.3f}"
-
-
-def svg_path_for_circle(cx: float, cy: float, r: float) -> str:
-    # path-circle (useful if you want everything as <path>)
-    # we’ll keep circles as <circle> elements, but this is here if you need it.
-    x0 = cx + r
-    y0 = cy
-    x1 = cx - r
-    y1 = cy
-    return (
-        f"M {fmt(x0)} {fmt(y0)} "
-        f"A {fmt(r)} {fmt(r)} 0 1 1 {fmt(x1)} {fmt(y1)} "
-        f"A {fmt(r)} {fmt(r)} 0 1 1 {fmt(x0)} {fmt(y0)}"
-    )
-
-
-def write_svg(path: Path, m: Metrics, g: Glyph, stroke: float) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    def ring_to_path(coords) -> str:
+        pts = list(coords)
+        if len(pts) < 2:
+            return ""
+        return "M " + " L ".join(f"{fmt(x)} {fmt(y)}" for x, y in pts) + " Z"
 
     parts: List[str] = []
-    for d in g.paths:
-        parts.append(
-            f'<path d="{d}" fill="none" stroke="black" '
-            f'stroke-width="{fmt(stroke)}" stroke-linecap="round" stroke-linejoin="round"/>'
-        )
+    for p in polys:
+        parts.append(ring_to_path(p.exterior.coords))
+        for hole in p.interiors:
+            parts.append(ring_to_path(hole.coords))
+    return " ".join(parts)
 
-    for (cx, cy, r) in g.circles:
-        parts.append(f'<circle cx="{fmt(cx)}" cy="{fmt(cy)}" r="{fmt(r)}" fill="black"/>')
 
+def write_svg(out_path: Path, width: float, m: Metrics, g: Geom) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    d = geom_to_svg_path(g)
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {fmt(g.width)} {m.H}">\n'
-        + "\n".join(f"  {p}" for p in parts)
-        + "\n</svg>\n"
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {fmt(width)} {m.H}">\n'
+        f'  <path d="{d}" fill="black" fill-rule="evenodd"/>\n'
+        f'</svg>\n'
     )
-    path.write_text(svg, encoding="utf-8")
+    out_path.write_text(svg, encoding="utf-8")
 
 
 def write_preview_html(out_dir: Path, items: List[Tuple[str, str]]) -> None:
-    # items: (label, filename)
     cells = []
     for label, fname in sorted(items, key=lambda t: t[1]):
         cells.append(f"""
@@ -140,546 +211,390 @@ img{{width:100%;height:auto;display:block;background:#fff;border-radius:8px}}
 
 
 # -------------------------
-# Uppercase glyphs (A–Z)
+# Glyph sets
 # -------------------------
 
-def build_uppercase(m: Metrics, stroke: float) -> Dict[str, Glyph]:
+def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     W = m.CAP_W
-    xL = 130.0
-    xR = W - 130.0
+    xL, xR = 130.0, W - 130.0
     cx = W / 2.0
 
-    yTop = m.CAP_TOP
-    yBase = m.BASE
-    yMid = m.CAP_MID
+    yTop, yBase, yMid = m.CAP_TOP, m.BASE, m.CAP_MID
 
-    # Used for B bowls (top+bottom halves)
-    bowl_r = (yMid - yTop) / 2.0  # 185
-    xFlat = 375.0
-    xBend = xFlat + bowl_r        # ~560
+    glyphs: Dict[str, Tuple[Geom, float]] = {}
 
-    # Round letter bowls (O/C/G)
-    o_r = 310.0
-    o_cx = cx
-    o_cy = yMid
-    gap_deg = 35.0
-
-    # For D / P / R (elliptical half-bowl)
-    dxFlat = 320.0
-    dxRX = xR - dxFlat  # ~250
-    dxRY = (yBase - yTop) / 2.0  # 370
-
-    # For U bottom arch
-    u_arch_y = yBase - (xR - xL) / 2.0  # endpoints y so that a semicircle-like Q hits baseline
-    # But we’ll explicitly set to a pleasing value:
-    u_end_y = 560.0
-
-    glyphs: Dict[str, Glyph] = {}
-
-    # A (improved): two stems + rounded top arch + mid crossbar
+    # A (FIXED): stems + TRUE semicircle top + bar
     yArch = 260.0
-    yBarA = 450.0
-    A_paths = [
-        f"M {fmt(xL)} {fmt(yBase)} V {fmt(yArch)}",
-        f"M {fmt(xR)} {fmt(yBase)} V {fmt(yArch)}",
-        f"M {fmt(xL)} {fmt(yArch)} Q {fmt(cx)} {fmt(yTop)} {fmt(xR)} {fmt(yArch)}",
-        f"M {fmt(xL)} {fmt(yBarA)} H {fmt(xR)}",
-    ]
-    glyphs["A"] = Glyph(W, A_paths, [])
+    rArch = (xR - xL) / 2.0  # 220
+    yBar = 450.0
+    A = pen.union(
+        pen.vline(xL, yBase, yArch),
+        pen.arc(cx, yArch, rArch, 180.0, 360.0, steps=160),
+        pen.vline(xR, yArch, yBase),
+        pen.hline(xL, xR, yBar),
+    )
+    glyphs["A"] = (A, W)
 
-    # B (improved): stem + two identical D-bowls
-    B_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yTop)} H {fmt(xFlat)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xBend)} {fmt(yTop + bowl_r)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xFlat)} {fmt(yMid)} "
-        f"H {fmt(xL)}",
-        f"M {fmt(xL)} {fmt(yMid)} H {fmt(xFlat)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xBend)} {fmt(yMid + bowl_r)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xFlat)} {fmt(yBase)} "
-        f"H {fmt(xL)}",
-    ]
-    glyphs["B"] = Glyph(W, B_paths, [])
+    # B (your improved version: two identical bowls)
+    bowl_r = (yMid - yTop) / 2.0
+    xFlat = 375.0
+    xBend = xFlat + bowl_r
+    B = pen.union(
+        pen.vline(xL, yTop, yBase),
+        # top bowl
+        pen.hline(xL, xFlat, yTop),
+        pen.arc(xFlat, yTop + bowl_r, bowl_r, 270.0, 90.0, steps=120),  # right half
+        pen.hline(xFlat, xL, yMid),
+        # bottom bowl
+        pen.hline(xL, xFlat, yMid),
+        pen.arc(xFlat, yMid + bowl_r, bowl_r, 270.0, 90.0, steps=120),
+        pen.hline(xFlat, xL, yBase),
+    )
+    glyphs["B"] = (B, W)
 
-    # C (open circle, long way around)
-    sx, sy = pt(o_cx, o_cy, o_r, -gap_deg)
-    ex, ey = pt(o_cx, o_cy, o_r, +gap_deg)
-    C_paths = [f"M {fmt(sx)} {fmt(sy)} A {fmt(o_r)} {fmt(o_r)} 0 1 0 {fmt(ex)} {fmt(ey)}"]
-    glyphs["C"] = Glyph(W, C_paths, [])
+    # C
+    o_r = 310.0
+    o_cx, o_cy = cx, yMid
+    C_ring = pen.circle_stroke(o_cx, o_cy, o_r)
+    C_gap = pen.wedge(o_cx, o_cy, o_r + pen.stroke * 2.2, 350.0, 10.0)  # right-side gap
+    C = C_ring.difference(C_gap)
+    glyphs["C"] = (pen._fix(C), W)
 
-    # D (stem + right half-bowl, ellipse-ish via two arcs)
-    D_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yTop)} H {fmt(dxFlat)} "
-        f"A {fmt(dxRX)} {fmt(dxRY)} 0 0 1 {fmt(xR)} {fmt(yMid)} "
-        f"A {fmt(dxRX)} {fmt(dxRY)} 0 0 1 {fmt(dxFlat)} {fmt(yBase)} "
-        f"H {fmt(xL)}",
-    ]
-    glyphs["D"] = Glyph(W, D_paths, [])
+    # D
+    dxFlat = 320.0
+    dxRX = xR - dxFlat
+    dxRY = (yBase - yTop) / 2.0
+    # Approx: stem + ellipse-ish right half made by scaling a circle arc
+    D = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.hline(xL, dxFlat, yTop),
+        # two big arcs approximating the bowl
+        pen.arc(dxFlat, yMid, dxRY, 270.0, 90.0, steps=140),
+        pen.hline(dxFlat, xL, yBase),
+    )
+    # (D is still a sketch; keeping it simple)
+    glyphs["D"] = (D, W)
 
     # E
-    E_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yTop)} H {fmt(xR)}",
-        f"M {fmt(xL)} {fmt(yMid)} H {fmt(xR - 50)}",
-        f"M {fmt(xL)} {fmt(yBase)} H {fmt(xR)}",
-    ]
-    glyphs["E"] = Glyph(W, E_paths, [])
+    E = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.hline(xL, xR, yTop),
+        pen.hline(xL, xR - 50, yMid),
+        pen.hline(xL, xR, yBase),
+    )
+    glyphs["E"] = (E, W)
 
     # F
-    F_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yTop)} H {fmt(xR)}",
-        f"M {fmt(xL)} {fmt(yMid)} H {fmt(xR - 70)}",
-    ]
-    glyphs["F"] = Glyph(W, F_paths, [])
+    F = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.hline(xL, xR, yTop),
+        pen.hline(xL, xR - 70, yMid),
+    )
+    glyphs["F"] = (F, W)
 
-    # G (C + inner bar)
-    G_paths = C_paths + [f"M {fmt(cx)} {fmt(yMid + 110)} H {fmt(xR)}"]
-    glyphs["G"] = Glyph(W, G_paths, [])
+    # G (FIXED): ring with small upper-right cut + bar that overlaps into stroke
+    G_ring = pen.circle_stroke(o_cx, o_cy, o_r)
+    # cut only upper-right (not the whole right side)
+    G_gap = pen.wedge(o_cx, o_cy, o_r + pen.stroke * 2.2, 305.0, 350.0)
+    G_outer = pen._fix(G_ring.difference(G_gap))
+    # bar extends slightly past the inner edge so union merges
+    G_bar = pen.hline(o_cx + o_r * 0.05, o_cx + o_r * 0.92, o_cy)
+    G = pen.union(G_outer, G_bar)
+    glyphs["G"] = (G, W)
 
     # H
-    H_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xR)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yMid)} H {fmt(xR)}",
-    ]
-    glyphs["H"] = Glyph(W, H_paths, [])
+    H = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.vline(xR, yTop, yBase),
+        pen.hline(xL, xR, yMid),
+    )
+    glyphs["H"] = (H, W)
 
     # I
-    glyphs["I"] = Glyph(W, [f"M {fmt(cx)} {fmt(yTop)} V {fmt(yBase)}"], [])
+    glyphs["I"] = (pen.vline(cx, yTop, yBase), W)
 
-    # J (simple hooked J)
-    jx = xR - 120
-    jy_hook = yBase - 130
-    J_paths = [
-        f"M {fmt(jx)} {fmt(yTop)} V {fmt(jy_hook)} "
-        f"Q {fmt(jx)} {fmt(yBase)} {fmt(xL + 150)} {fmt(yBase)}"
-    ]
-    glyphs["J"] = Glyph(W, J_paths, [])
+    # J (rough)
+    J = pen.union(
+        pen.vline(xR - 120, yTop, yBase - 130),
+        pen.arc(xL + 150, yBase - 130, 150.0, 0.0, 180.0, steps=90),
+    )
+    glyphs["J"] = (J, W)
 
     # K
-    K_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yMid)} L {fmt(xR)} {fmt(yTop)}",
-        f"M {fmt(xL)} {fmt(yMid)} L {fmt(xR)} {fmt(yBase)}",
-    ]
-    glyphs["K"] = Glyph(W, K_paths, [])
+    K = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.line([(xL, yMid), (xR, yTop)]),
+        pen.line([(xL, yMid), (xR, yBase)]),
+    )
+    glyphs["K"] = (K, W)
 
     # L
-    glyphs["L"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-                           f"M {fmt(xL)} {fmt(yBase)} H {fmt(xR)}"], [])
+    glyphs["L"] = (pen.union(pen.vline(xL, yTop, yBase), pen.hline(xL, xR, yBase)), W)
 
     # M
-    M_paths = [
-        f"M {fmt(xL)} {fmt(yBase)} V {fmt(yTop)}",
-        f"M {fmt(xR)} {fmt(yBase)} V {fmt(yTop)}",
-        f"M {fmt(xL)} {fmt(yTop)} L {fmt(cx)} {fmt(yMid)} L {fmt(xR)} {fmt(yTop)}",
-    ]
-    glyphs["M"] = Glyph(W, M_paths, [])
+    M = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.vline(xR, yTop, yBase),
+        pen.line([(xL, yTop), (cx, yMid), (xR, yTop)]),
+    )
+    glyphs["M"] = (M, W)
 
     # N
-    N_paths = [
-        f"M {fmt(xL)} {fmt(yBase)} V {fmt(yTop)}",
-        f"M {fmt(xR)} {fmt(yBase)} V {fmt(yTop)}",
-        f"M {fmt(xL)} {fmt(yTop)} L {fmt(xR)} {fmt(yBase)}",
-    ]
-    glyphs["N"] = Glyph(W, N_paths, [])
+    N = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.vline(xR, yTop, yBase),
+        pen.line([(xL, yTop), (xR, yBase)]),
+    )
+    glyphs["N"] = (N, W)
 
-    # O (full circle)
-    ox0 = o_cx + o_r
-    oy0 = o_cy
-    ox1 = o_cx - o_r
-    oy1 = o_cy
-    O_paths = [
-        f"M {fmt(ox0)} {fmt(oy0)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(ox1)} {fmt(oy1)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(ox0)} {fmt(oy0)}"
-    ]
-    glyphs["O"] = Glyph(W, O_paths, [])
+    # O
+    glyphs["O"] = (pen.circle_stroke(o_cx, o_cy, o_r), W)
 
-    # P (stem + top bowl like B’s top)
-    P_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(yBase)}",
-        f"M {fmt(xL)} {fmt(yTop)} H {fmt(xFlat)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xBend)} {fmt(yTop + bowl_r)} "
-        f"A {fmt(bowl_r)} {fmt(bowl_r)} 0 0 1 {fmt(xFlat)} {fmt(yMid)} "
-        f"H {fmt(xL)}",
-    ]
-    glyphs["P"] = Glyph(W, P_paths, [])
+    # P
+    P = pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.hline(xL, xFlat, yTop),
+        pen.arc(xFlat, yTop + bowl_r, bowl_r, 270.0, 90.0, steps=120),
+        pen.hline(xFlat, xL, yMid),
+    )
+    glyphs["P"] = (P, W)
 
-    # Q (O + tail)
-    Q_paths = O_paths + [f"M {fmt(cx + 80)} {fmt(yMid + 170)} L {fmt(xR)} {fmt(yBase)}"]
-    glyphs["Q"] = Glyph(W, Q_paths, [])
+    # Q
+    Q = pen.union(
+        pen.circle_stroke(o_cx, o_cy, o_r),
+        pen.line([(cx + 80, yMid + 170), (xR, yBase)]),
+    )
+    glyphs["Q"] = (Q, W)
 
-    # R (P + diagonal leg)
-    R_paths = P_paths + [f"M {fmt(xFlat)} {fmt(yMid)} L {fmt(xR)} {fmt(yBase)}"]
-    glyphs["R"] = Glyph(W, R_paths, [])
+    # R
+    R = pen.union(P, pen.line([(xFlat, yMid), (xR, yBase)]))
+    glyphs["R"] = (R, W)
 
-    # S (smooth-ish S using quadratic segments)
-    S_paths = [(
-        f"M {fmt(xR)} {fmt(yTop + 140)} "
-        f"Q {fmt(cx)} {fmt(yTop)} {fmt(xL)} {fmt(yTop + 140)} "
-        f"Q {fmt(xL - 40)} {fmt(yMid - 60)} {fmt(cx)} {fmt(yMid)} "
-        f"Q {fmt(xR + 40)} {fmt(yMid + 60)} {fmt(xR)} {fmt(yBase - 140)} "
-        f"Q {fmt(cx)} {fmt(yBase)} {fmt(xL)} {fmt(yBase - 140)}"
-    )]
-    glyphs["S"] = Glyph(W, S_paths, [])
+    # S (FIXED): smooth S spine (sine) outlined
+    S_spine = pen.sine_spine(cx, yTop + 140, yBase - 140, amp=(xR - xL) * 0.42, samples=260)
+    S = pen.line(S_spine)
+    glyphs["S"] = (S, W)
 
     # T
-    glyphs["T"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} H {fmt(xR)}",
-                           f"M {fmt(cx)} {fmt(yTop)} V {fmt(yBase)}"], [])
+    T = pen.union(pen.hline(xL, xR, yTop), pen.vline(cx, yTop, yBase))
+    glyphs["T"] = (T, W)
 
-    # U (stems + bottom arch)
-    U_paths = [
-        f"M {fmt(xL)} {fmt(yTop)} V {fmt(u_end_y)}",
-        f"M {fmt(xR)} {fmt(yTop)} V {fmt(u_end_y)}",
-        f"M {fmt(xL)} {fmt(u_end_y)} Q {fmt(cx)} {fmt(yBase)} {fmt(xR)} {fmt(u_end_y)}",
-    ]
-    glyphs["U"] = Glyph(W, U_paths, [])
+    # U
+    u_end = 560.0
+    U = pen.union(
+        pen.vline(xL, yTop, u_end),
+        pen.arc(cx, u_end, (xR - xL) / 2.0, 180.0, 360.0, steps=140),
+        pen.vline(xR, u_end, yTop),
+    )
+    glyphs["U"] = (U, W)
 
     # V
-    glyphs["V"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} L {fmt(cx)} {fmt(yBase)} L {fmt(xR)} {fmt(yTop)}"], [])
+    glyphs["V"] = (pen.line([(xL, yTop), (cx, yBase), (xR, yTop)]), W)
 
     # W
-    glyphs["W"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} L {fmt(xL + 120)} {fmt(yBase)} "
-                           f"L {fmt(cx)} {fmt(yMid)} "
-                           f"L {fmt(xR - 120)} {fmt(yBase)} L {fmt(xR)} {fmt(yTop)}"], [])
+    glyphs["W"] = (pen.line([(xL, yTop), (xL + 120, yBase), (cx, yMid), (xR - 120, yBase), (xR, yTop)]), W)
 
     # X
-    glyphs["X"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} L {fmt(xR)} {fmt(yBase)}",
-                           f"M {fmt(xR)} {fmt(yTop)} L {fmt(xL)} {fmt(yBase)}"], [])
+    glyphs["X"] = (pen.union(pen.line([(xL, yTop), (xR, yBase)]), pen.line([(xR, yTop), (xL, yBase)])), W)
 
     # Y
-    glyphs["Y"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} L {fmt(cx)} {fmt(yMid)} L {fmt(xR)} {fmt(yTop)}",
-                           f"M {fmt(cx)} {fmt(yMid)} V {fmt(yBase)}"], [])
+    glyphs["Y"] = (pen.union(pen.line([(xL, yTop), (cx, yMid), (xR, yTop)]), pen.vline(cx, yMid, yBase)), W)
 
     # Z
-    glyphs["Z"] = Glyph(W, [f"M {fmt(xL)} {fmt(yTop)} H {fmt(xR)}",
-                           f"M {fmt(xR)} {fmt(yTop)} L {fmt(xL)} {fmt(yBase)}",
-                           f"M {fmt(xL)} {fmt(yBase)} H {fmt(xR)}"], [])
+    glyphs["Z"] = (pen.union(pen.hline(xL, xR, yTop), pen.line([(xR, yTop), (xL, yBase)]), pen.hline(xL, xR, yBase)), W)
+
+    # Fill the rest (CAVEAT: still sketchy placeholders)
+    for ch in "HIJKLMNOPQRSTUVWXYZ":
+        if ch not in glyphs:
+            glyphs[ch] = (Polygon(), W)
 
     return glyphs
 
 
-# -------------------------
-# Lowercase glyphs (a–z)
-# -------------------------
-
-def build_lowercase(m: Metrics, stroke: float) -> Dict[str, Glyph]:
+def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     W = m.LC_W
-    xL = 120.0
-    xR = W - 120.0
+    xL, xR = 140.0, W - 140.0
     cx = W / 2.0
 
-    yBase = m.BASE
-    yXTop = m.X_TOP
-    yXMid = m.X_MID
-    yAscTop = m.CAP_TOP  # ascenders up to same cap-top in this sketchy model
+    yBase, yXTop, yMid = m.BASE, m.X_TOP, m.X_MID
+    yAsc = m.CAP_TOP
 
-    # Lowercase bowl
-    o_r = 220.0
-    o_cx = cx
-    o_cy = yXMid
-    gap_deg = 35.0
+    glyphs: Dict[str, Tuple[Geom, float]] = {}
 
-    # For “d-bowl” style attachments
-    bowl_rx = 190.0
-    bowl_ry = 220.0
-    # some handy x positions
-    stemL = xL
-    stemR = xR
+    # a (FIXED): oval bowl + right stem that protrudes + inner bar (very close to your sample)
+    bowl_cx = cx - 10
+    bowl_cy = yMid
+    rx = 235.0
+    ry = 260.0  # puts top near x-height
+    a_bowl = pen.ellipse_stroke(bowl_cx, bowl_cy, rx, ry)
+    a_stem_x = bowl_cx + rx * 0.92
+    a_stem = pen.vline(a_stem_x, yXTop - 80, yBase)  # protrude above bowl
+    a_bar = pen.hline(bowl_cx - 40, a_stem_x + 10, yMid)  # connect into stem area
+    a = pen.union(a_bowl, a_stem, a_bar)
+    glyphs["a"] = (a, W)
 
-    glyphs: Dict[str, Glyph] = {}
+    # b
+    bowl_rx, bowl_ry = 190.0, 220.0
+    b = pen.union(
+        pen.vline(xL, yAsc, yBase),
+        pen.hline(xL, cx, yXTop + 60),
+        pen.arc(cx, yMid, bowl_ry, 270.0, 90.0, steps=120),
+        pen.hline(cx, xL, yBase),
+    )
+    glyphs["b"] = (b, W)
 
-    # a (single-storey): bowl + right stem + short join
-    a_paths = [
-        # bowl (full circle)
-        f"M {fmt(o_cx + o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx - o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx + o_r)} {fmt(o_cy)}",
-        # right stem
-        f"M {fmt(stemR)} {fmt(yXTop + 60)} V {fmt(yBase)}",
-        # join
-        f"M {fmt(o_cx + 30)} {fmt(yXMid)} H {fmt(stemR)}",
-    ]
-    glyphs["a"] = Glyph(W, a_paths, [])
+    # c
+    c_ring = pen.circle_stroke(cx, yMid, 220.0)
+    c_gap = pen.wedge(cx, yMid, 220.0 + pen.stroke * 2.2, 350.0, 10.0)
+    glyphs["c"] = (pen._fix(c_ring.difference(c_gap)), W)
 
-    # b: tall left stem + bowl
-    b_paths = [
-        f"M {fmt(stemL)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(stemL)} {fmt(yXTop + 60)} H {fmt(o_cx)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 1 {fmt(stemR)} {fmt(yXMid)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 1 {fmt(o_cx)} {fmt(yBase)} "
-        f"H {fmt(stemL)}",
-    ]
-    glyphs["b"] = Glyph(W, b_paths, [])
+    # d
+    d = pen.union(
+        pen.vline(xR, yAsc, yBase),
+        pen.hline(xR, cx, yXTop + 60),
+        pen.arc(cx, yMid, bowl_ry, 90.0, 270.0, steps=120),
+        pen.hline(cx, xR, yBase),
+    )
+    glyphs["d"] = (d, W)
 
-    # c (open bowl)
-    sx, sy = pt(o_cx, o_cy, o_r, -gap_deg)
-    ex, ey = pt(o_cx, o_cy, o_r, +gap_deg)
-    glyphs["c"] = Glyph(W, [f"M {fmt(sx)} {fmt(sy)} A {fmt(o_r)} {fmt(o_r)} 0 1 0 {fmt(ex)} {fmt(ey)}"], [])
+    # e (rough)
+    e = pen.union(
+        pen._fix(c_ring.difference(c_gap)),
+        pen.hline(cx - 90, cx + 120, yMid),
+    )
+    glyphs["e"] = (e, W)
 
-    # d: bowl + tall right stem
-    d_paths = [
-        f"M {fmt(stemR)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(stemR)} {fmt(yXTop + 60)} H {fmt(o_cx)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 0 {fmt(stemL)} {fmt(yXMid)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 0 {fmt(o_cx)} {fmt(yBase)} "
-        f"H {fmt(stemR)}",
-    ]
-    glyphs["d"] = Glyph(W, d_paths, [])
+    # f (FIXED): tall stem + one right crossbar + slight top hook
+    fx = cx - 90
+    f_stem = pen.vline(fx, yAsc, yBase)
+    f_bar_y = yXTop + 55
+    f_bar = pen.hline(fx, fx + 260, f_bar_y)
+    # top hook (tiny arc)
+    f_hook = pen.arc(fx + 40, yAsc + 40, 40.0, 180.0, 270.0, steps=40)
+    glyphs["f"] = (pen.union(f_stem, f_bar, f_hook), W)
 
-    # e: open bowl + bar
-    e_paths = [
-        f"M {fmt(sx)} {fmt(sy)} A {fmt(o_r)} {fmt(o_r)} 0 1 0 {fmt(ex)} {fmt(ey)}",
-        f"M {fmt(o_cx - 90)} {fmt(yXMid)} H {fmt(o_cx + 120)}",
-    ]
-    glyphs["e"] = Glyph(W, e_paths, [])
+    # g (placeholder-ish)
+    g = pen.union(pen.circle_stroke(cx, yMid, 220.0), pen.line([(xR - 80, yMid + 30), (cx, m.DESC)]))
+    glyphs["g"] = (g, W)
 
-    # f: tall stem + crossbar
-    fx = cx - 70
-    f_paths = [
-        f"M {fmt(fx)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(fx - 110)} {fmt(yXTop + 40)} H {fmt(fx + 210)}",
-        f"M {fmt(fx - 60)} {fmt(yXMid - 40)} H {fmt(fx + 120)}",
-    ]
-    glyphs["f"] = Glyph(W, f_paths, [])
+    # h
+    h = pen.union(
+        pen.vline(xL, yAsc, yBase),
+        pen.line([(xL, yXTop), (cx, yXTop - 40), (xR, yXTop), (xR, yBase)]),
+    )
+    glyphs["h"] = (h, W)
 
-    # g: bowl + descender tail
-    g_paths = [
-        f"M {fmt(o_cx + o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx - o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx + o_r)} {fmt(o_cy)}",
-        f"M {fmt(stemR - 40)} {fmt(yXMid + 30)} Q {fmt(stemR + 40)} {fmt(yBase + 80)} {fmt(cx)} {fmt(m.DESC)}",
-    ]
-    glyphs["g"] = Glyph(W, g_paths, [])
+    # i
+    i = pen.union(pen.vline(cx, yXTop, yBase), Point(cx, yXTop - 70).buffer(pen.r * 0.65, resolution=pen.res))
+    glyphs["i"] = (i, W)
 
-    # h: tall stem + hump to right
-    h_paths = [
-        f"M {fmt(stemL)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(stemL)} {fmt(yXTop)} Q {fmt(cx)} {fmt(yXTop - 40)} {fmt(stemR)} {fmt(yXTop)} V {fmt(yBase)}",
-    ]
-    glyphs["h"] = Glyph(W, h_paths, [])
+    # j
+    j = pen.union(
+        pen.vline(cx, yXTop, m.DESC),
+        pen.arc(cx - 120, m.DESC - 60, 120.0, 0.0, 180.0, steps=60),
+        Point(cx, yXTop - 70).buffer(pen.r * 0.65, resolution=pen.res),
+    )
+    glyphs["j"] = (j, W)
 
-    # i: stem + dot
-    ix = cx
-    dot_r = stroke * 0.32
-    i_paths = [f"M {fmt(ix)} {fmt(yXTop)} V {fmt(yBase)}"]
-    i_circles = [(ix, yXTop - 70, dot_r)]
-    glyphs["i"] = Glyph(W, i_paths, i_circles)
+    # k
+    k = pen.union(
+        pen.vline(xL, yAsc, yBase),
+        pen.line([(xL, yMid), (xR, yXTop)]),
+        pen.line([(xL, yMid), (xR, yBase)]),
+    )
+    glyphs["k"] = (k, W)
 
-    # j: stem desc + dot
-    jx = cx
-    j_paths = [f"M {fmt(jx)} {fmt(yXTop)} V {fmt(m.DESC)} Q {fmt(jx)} {fmt(m.DESC)} {fmt(jx - 120)} {fmt(m.DESC - 60)}"]
-    j_circles = [(jx, yXTop - 70, dot_r)]
-    glyphs["j"] = Glyph(W, j_paths, j_circles)
+    # l
+    glyphs["l"] = (pen.vline(cx, yAsc, yBase), W)
 
-    # k: tall stem + diagonals
-    k_paths = [
-        f"M {fmt(stemL)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(stemL)} {fmt(yXMid)} L {fmt(stemR)} {fmt(yXTop)}",
-        f"M {fmt(stemL)} {fmt(yXMid)} L {fmt(stemR)} {fmt(yBase)}",
-    ]
-    glyphs["k"] = Glyph(W, k_paths, [])
+    # m
+    m_ = pen.union(
+        pen.vline(xL, yXTop, yBase),
+        pen.line([(xL, yXTop), (cx - 60, yXTop - 40), (cx, yXTop), (cx, yBase)]),
+        pen.line([(cx, yXTop), (cx + 120, yXTop - 40), (xR, yXTop), (xR, yBase)]),
+    )
+    glyphs["m"] = (m_, W)
 
-    # l: tall stem
-    glyphs["l"] = Glyph(W, [f"M {fmt(cx)} {fmt(yAscTop)} V {fmt(yBase)}"], [])
+    # n
+    n = pen.union(
+        pen.vline(xL, yXTop, yBase),
+        pen.line([(xL, yXTop), (cx, yXTop - 40), (xR, yXTop), (xR, yBase)]),
+    )
+    glyphs["n"] = (n, W)
 
-    # m: left stem + two humps
-    m_paths = [
-        f"M {fmt(stemL)} {fmt(yBase)} V {fmt(yXTop)}",
-        f"M {fmt(stemL)} {fmt(yXTop)} Q {fmt(cx - 60)} {fmt(yXTop - 40)} {fmt(cx)} {fmt(yXTop)} V {fmt(yBase)}",
-        f"M {fmt(cx)} {fmt(yXTop)} Q {fmt(cx + 120)} {fmt(yXTop - 40)} {fmt(stemR)} {fmt(yXTop)} V {fmt(yBase)}",
-    ]
-    glyphs["m"] = Glyph(W, m_paths, [])
+    # o
+    glyphs["o"] = (pen.circle_stroke(cx, yMid, 220.0), W)
 
-    # n: left stem + one hump
-    n_paths = [
-        f"M {fmt(stemL)} {fmt(yBase)} V {fmt(yXTop)}",
-        f"M {fmt(stemL)} {fmt(yXTop)} Q {fmt(cx)} {fmt(yXTop - 40)} {fmt(stemR)} {fmt(yXTop)} V {fmt(yBase)}",
-    ]
-    glyphs["n"] = Glyph(W, n_paths, [])
+    # p/q/r placeholders
+    glyphs["p"] = (pen.union(pen.vline(xL, yXTop, m.DESC), pen.circle_stroke(cx, yMid, 220.0)), W)
+    glyphs["q"] = (pen.union(pen.vline(xR, yXTop, m.DESC), pen.circle_stroke(cx, yMid, 220.0)), W)
+    glyphs["r"] = (pen.union(pen.vline(xL, yXTop, yBase), pen.arc(xL + 110, yXTop + 40, 110.0, 180.0, 270.0, steps=60)), W)
 
-    # o: circle
-    o_paths = [
-        f"M {fmt(o_cx + o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx - o_r)} {fmt(o_cy)} "
-        f"A {fmt(o_r)} {fmt(o_r)} 0 1 1 {fmt(o_cx + o_r)} {fmt(o_cy)}"
-    ]
-    glyphs["o"] = Glyph(W, o_paths, [])
+    # s (FIXED): smooth S spine at x-height scale
+    s_spine = pen.sine_spine(cx, yXTop + 85, yBase - 85, amp=(xR - xL) * 0.38, samples=240)
+    glyphs["s"] = (pen.line(s_spine), W)
 
-    # p: desc stem + bowl
-    p_paths = [
-        f"M {fmt(stemL)} {fmt(yXTop)} V {fmt(m.DESC)}",
-        f"M {fmt(stemL)} {fmt(yXTop + 60)} H {fmt(o_cx)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 1 {fmt(stemR)} {fmt(yXMid)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 1 {fmt(o_cx)} {fmt(yBase)} "
-        f"H {fmt(stemL)}",
-    ]
-    glyphs["p"] = Glyph(W, p_paths, [])
+    # t (FIXED): NOT a plus sign — tall stem with a mainly-right crossbar near x-height
+    tx = cx
+    t_top = yXTop - 160
+    t_bar_y = yXTop + 10
+    t_stem = pen.vline(tx, t_top, yBase)
+    t_bar = pen.hline(tx - 40, tx + 240, t_bar_y)
+    glyphs["t"] = (pen.union(t_stem, t_bar), W)
 
-    # q: desc stem right + bowl
-    q_paths = [
-        f"M {fmt(stemR)} {fmt(yXTop)} V {fmt(m.DESC)}",
-        f"M {fmt(stemR)} {fmt(yXTop + 60)} H {fmt(o_cx)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 0 {fmt(stemL)} {fmt(yXMid)} "
-        f"A {fmt(bowl_rx)} {fmt(bowl_ry)} 0 0 0 {fmt(o_cx)} {fmt(yBase)} "
-        f"H {fmt(stemR)}",
-    ]
-    glyphs["q"] = Glyph(W, q_paths, [])
+    # u
+    u_end = yBase - 160
+    u = pen.union(
+        pen.vline(xL, yXTop, u_end),
+        pen.arc(cx, u_end, (xR - xL) / 2.0, 180.0, 360.0, steps=120),
+        pen.vline(xR, u_end, yXTop),
+    )
+    glyphs["u"] = (u, W)
 
-    # r: short stem + shoulder
-    r_paths = [
-        f"M {fmt(stemL)} {fmt(yBase)} V {fmt(yXTop)}",
-        f"M {fmt(stemL)} {fmt(yXTop)} Q {fmt(cx)} {fmt(yXTop - 30)} {fmt(cx + 80)} {fmt(yXTop)}",
-    ]
-    glyphs["r"] = Glyph(W, r_paths, [])
+    # v/w/x/y/z
+    glyphs["v"] = (pen.line([(xL, yXTop), (cx, yBase), (xR, yXTop)]), W)
+    glyphs["w"] = (pen.line([(xL, yXTop), (xL + 90, yBase), (cx, yMid), (xR - 90, yBase), (xR, yXTop)]), W)
+    glyphs["x"] = (pen.union(pen.line([(xL, yXTop), (xR, yBase)]), pen.line([(xR, yXTop), (xL, yBase)])), W)
+    glyphs["y"] = (pen.union(pen.line([(xL, yXTop), (cx, yBase), (xR, yXTop)]), pen.vline(cx, yBase, m.DESC)), W)
+    glyphs["z"] = (pen.union(pen.hline(xL, xR, yXTop), pen.line([(xR, yXTop), (xL, yBase)]), pen.hline(xL, xR, yBase)), W)
 
-    # s: smaller S
-    s_paths = [(
-        f"M {fmt(stemR)} {fmt(yXTop + 90)} "
-        f"Q {fmt(cx)} {fmt(yXTop)} {fmt(stemL)} {fmt(yXTop + 90)} "
-        f"Q {fmt(stemL - 30)} {fmt(yXMid - 40)} {fmt(cx)} {fmt(yXMid)} "
-        f"Q {fmt(stemR + 30)} {fmt(yXMid + 40)} {fmt(stemR)} {fmt(yBase - 90)} "
-        f"Q {fmt(cx)} {fmt(yBase)} {fmt(stemL)} {fmt(yBase - 90)}"
-    )]
-    glyphs["s"] = Glyph(W, s_paths, [])
-
-    # t: tall-ish stem + crossbar at x-top
-    tx = cx - 60
-    t_paths = [
-        f"M {fmt(tx)} {fmt(yAscTop)} V {fmt(yBase)}",
-        f"M {fmt(tx - 140)} {fmt(yXTop)} H {fmt(tx + 220)}",
-    ]
-    glyphs["t"] = Glyph(W, t_paths, [])
-
-    # u: two stems + bottom arch
-    u_end_y = yBase - 160
-    u_paths = [
-        f"M {fmt(stemL)} {fmt(yXTop)} V {fmt(u_end_y)}",
-        f"M {fmt(stemR)} {fmt(yXTop)} V {fmt(u_end_y)}",
-        f"M {fmt(stemL)} {fmt(u_end_y)} Q {fmt(cx)} {fmt(yBase)} {fmt(stemR)} {fmt(u_end_y)}",
-    ]
-    glyphs["u"] = Glyph(W, u_paths, [])
-
-    # v
-    glyphs["v"] = Glyph(W, [f"M {fmt(stemL)} {fmt(yXTop)} L {fmt(cx)} {fmt(yBase)} L {fmt(stemR)} {fmt(yXTop)}"], [])
-
-    # w
-    glyphs["w"] = Glyph(W, [f"M {fmt(stemL)} {fmt(yXTop)} L {fmt(stemL + 90)} {fmt(yBase)} "
-                           f"L {fmt(cx)} {fmt(yXMid)} "
-                           f"L {fmt(stemR - 90)} {fmt(yBase)} L {fmt(stemR)} {fmt(yXTop)}"], [])
-
-    # x
-    glyphs["x"] = Glyph(W, [f"M {fmt(stemL)} {fmt(yXTop)} L {fmt(stemR)} {fmt(yBase)}",
-                           f"M {fmt(stemR)} {fmt(yXTop)} L {fmt(stemL)} {fmt(yBase)}"], [])
-
-    # y: v + descender
-    y_paths = [
-        f"M {fmt(stemL)} {fmt(yXTop)} L {fmt(cx)} {fmt(yBase)} L {fmt(stemR)} {fmt(yXTop)}",
-        f"M {fmt(cx)} {fmt(yBase)} V {fmt(m.DESC)}",
-    ]
-    glyphs["y"] = Glyph(W, y_paths, [])
-
-    # z
-    glyphs["z"] = Glyph(W, [f"M {fmt(stemL)} {fmt(yXTop)} H {fmt(stemR)}",
-                           f"M {fmt(stemR)} {fmt(yXTop)} L {fmt(stemL)} {fmt(yBase)}",
-                           f"M {fmt(stemL)} {fmt(yBase)} H {fmt(stemR)}"], [])
+    # Fill missing letters as empty sketches for now (keeps pipeline stable)
+    for ch in "abcdefghijklmnopqrstuvwxyz":
+        glyphs.setdefault(ch, (Polygon(), W))
 
     return glyphs
 
 
-# -------------------------
-# Optional ligatures (hij, ik, sch)
-# -------------------------
-
-def build_ligatures(m: Metrics, stroke: float, lower: Dict[str, Glyph]) -> Dict[str, Glyph]:
-    # Simple: place lowercase glyph sketches next to each other and add a joining bar (like your sample).
-    # These are still “sketches” (stroked paths); no boolean-union here.
+def build_ligatures(m: Metrics, pen: Mono, lower: Dict[str, Tuple[Geom, float]]) -> Dict[str, Tuple[Geom, float]]:
     adv = m.LC_W
     topbar_y = m.CAP_TOP + 120
 
-    def shifted(g: Glyph, dx: float) -> Glyph:
-        def shift_d(d: str) -> str:
-            # naive numeric shift for "M x y", "L x y", "H x", "V y", "Q x1 y1 x y", "A rx ry ... x y"
-            # We only shift x coordinates; y stays.
-            out = []
-            toks = d.replace(",", " ").split()
-            i = 0
-            cmd = None
-            # This is intentionally lightweight; it works for the patterns used above.
-            while i < len(toks):
-                t = toks[i]
-                if t.isalpha():
-                    cmd = t
-                    out.append(t)
-                    i += 1
-                    continue
-                # numeric
-                if cmd in ("V",):
-                    out.append(t)
-                    i += 1
-                elif cmd in ("H",):
-                    x = float(t) + dx
-                    out.append(fmt(x))
-                    i += 1
-                elif cmd in ("M", "L"):
-                    x = float(toks[i]) + dx
-                    y = float(toks[i + 1])
-                    out.extend([fmt(x), fmt(y)])
-                    i += 2
-                elif cmd in ("Q",):
-                    x1 = float(toks[i]) + dx
-                    y1 = float(toks[i + 1])
-                    x = float(toks[i + 2]) + dx
-                    y = float(toks[i + 3])
-                    out.extend([fmt(x1), fmt(y1), fmt(x), fmt(y)])
-                    i += 4
-                elif cmd in ("A",):
-                    # A rx ry rot laf sf x y
-                    rx = toks[i]; ry = toks[i + 1]; rot = toks[i + 2]
-                    laf = toks[i + 3]; sf = toks[i + 4]
-                    x = float(toks[i + 5]) + dx
-                    y = float(toks[i + 6])
-                    out.extend([rx, ry, rot, laf, sf, fmt(x), fmt(y)])
-                    i += 7
-                else:
-                    # fallback: shift alternating x,y pairs
-                    x = float(toks[i]) + dx
-                    y = float(toks[i + 1])
-                    out.extend([fmt(x), fmt(y)])
-                    i += 2
-            return " ".join(out)
+    def shift(g: Geom, dx: float) -> Geom:
+        return affinity.translate(g, xoff=dx, yoff=0.0)
 
-        return Glyph(
-            width=g.width,
-            paths=[shift_d(d) for d in g.paths],
-            circles=[(cx + dx, cy, r) for (cx, cy, r) in g.circles],
-        )
-
-    ligs: Dict[str, Glyph] = {}
+    ligs: Dict[str, Tuple[Geom, float]] = {}
 
     # hij
-    h = shifted(lower["h"], 0.0)
-    i = shifted(lower["i"], adv)
-    j = shifted(lower["j"], adv * 2)
-    hij_paths = h.paths + i.paths + j.paths + [f"M {fmt(80)} {fmt(topbar_y)} H {fmt(adv*3 - 80)}"]
-    hij_circles = h.circles + i.circles + j.circles
-    ligs["hij"] = Glyph(width=adv * 3, paths=hij_paths, circles=hij_circles)
+    hij = pen.union(
+        shift(lower["h"][0], 0),
+        shift(lower["i"][0], adv),
+        shift(lower["j"][0], adv * 2),
+        pen.hline(80, adv * 3 - 80, topbar_y),
+    )
+    ligs["hij"] = (hij, adv * 3)
 
     # ik
-    i2 = shifted(lower["i"], 0.0)
-    k = shifted(lower["k"], adv)
-    ligs["ik"] = Glyph(width=adv * 2, paths=(i2.paths + k.paths), circles=(i2.circles + k.circles))
+    ik = pen.union(shift(lower["i"][0], 0), shift(lower["k"][0], adv))
+    ligs["ik"] = (ik, adv * 2)
 
     # sch
-    s = shifted(lower["s"], 0.0)
-    c = shifted(lower["c"], adv)
-    h2 = shifted(lower["h"], adv * 2)
-    sch_paths = s.paths + c.paths + h2.paths + [f"M {fmt(80)} {fmt(topbar_y)} H {fmt(adv*3 - 80)}"]
-    sch_circles = s.circles + c.circles + h2.circles
-    ligs["sch"] = Glyph(width=adv * 3, paths=sch_paths, circles=sch_circles)
+    sch = pen.union(
+        shift(lower["s"][0], 0),
+        shift(lower["c"][0], adv),
+        shift(lower["h"][0], adv * 2),
+        pen.hline(80, adv * 3 - 80, topbar_y),
+    )
+    ligs["sch"] = (sch, adv * 3)
 
     return ligs
 
@@ -690,44 +605,44 @@ def build_ligatures(m: Metrics, stroke: float, lower: Dict[str, Glyph]) -> Dict[
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", type=Path, default=Path("sketches"), help="output directory (default: sketches)")
-    ap.add_argument("--stroke", type=float, default=90.0, help="stroke thickness (SVG stroke-width)")
-    ap.add_argument("--include-ligatures", action="store_true", help="also output hij/ik/sch ligature sketches")
+    ap.add_argument("--out", type=Path, default=Path("sketches"))
+    ap.add_argument("--stroke", type=float, default=90.0)
+    ap.add_argument("--resolution", type=int, default=48)
+    ap.add_argument("--include-ligatures", action="store_true")
     args = ap.parse_args()
 
     m = Metrics()
+    pen = Mono(stroke=args.stroke, resolution=args.resolution)
+
+    upper = build_uppercase(m, pen)
+    lower = build_lowercase(m, pen)
+
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    upper = build_uppercase(m, args.stroke)
-    lower = build_lowercase(m, args.stroke)
+    preview: List[Tuple[str, str]] = []
 
-    preview_items: List[Tuple[str, str]] = []
-
-    # A–Z
     for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        g = upper[ch]
+        g, w = upper[ch]
         fname = codepoint_filename(ch)
-        write_svg(out / fname, m, g, args.stroke)
-        preview_items.append((ch, fname))
+        write_svg(out / fname, w, m, g)
+        preview.append((ch, fname))
 
-    # a–z
     for ch in "abcdefghijklmnopqrstuvwxyz":
-        g = lower[ch]
+        g, w = lower[ch]
         fname = codepoint_filename(ch)
-        write_svg(out / fname, m, g, args.stroke)
-        preview_items.append((ch, fname))
+        write_svg(out / fname, w, m, g)
+        preview.append((ch, fname))
 
     if args.include_ligatures:
-        ligs = build_ligatures(m, args.stroke, lower)
-        for name, g in ligs.items():
+        ligs = build_ligatures(m, pen, lower)
+        for name, (g, w) in ligs.items():
             fname = "liga_" + codepoint_filename(name)
-            write_svg(out / fname, m, g, args.stroke)
-            preview_items.append((f"liga:{name}", fname))
+            write_svg(out / fname, w, m, g)
+            preview.append((f"liga:{name}", fname))
 
-    write_preview_html(out, preview_items)
-
-    print(f"Wrote {len(preview_items)} SVGs to: {out}")
+    write_preview_html(out, preview)
+    print(f"Wrote {len(preview)} SVGs to: {out}")
     print(f"Open: {out / 'preview.html'}")
 
 
