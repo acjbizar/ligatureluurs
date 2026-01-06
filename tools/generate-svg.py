@@ -14,10 +14,6 @@ from shapely.ops import unary_union
 Geom = Union[Polygon, MultiPolygon]
 
 
-# -------------------------
-# Metrics (SVG y-down)
-# -------------------------
-
 @dataclass(frozen=True)
 class Metrics:
     H: int = 1000
@@ -27,7 +23,6 @@ class Metrics:
     CAP_W: float = 700.0
     LC_W: float = 600.0
 
-    # Lowercase x-height
     XH: float = 440.0  # baseline -> xheight distance
 
     @property
@@ -50,10 +45,6 @@ class Metrics:
     def DESC_END(self) -> float:
         return float(self.H - 30)
 
-
-# -------------------------
-# Helpers: parametric points
-# -------------------------
 
 def ellipse_point(cx: float, cy: float, rx: float, ry: float, deg: float) -> Tuple[float, float]:
     a = math.radians(deg)
@@ -109,10 +100,6 @@ def norm(vx: float, vy: float) -> Tuple[float, float]:
         return (0.0, 0.0)
     return (vx / n, vy / n)
 
-
-# -------------------------
-# Monoline builder
-# -------------------------
 
 class Mono:
     def __init__(self, stroke: float, resolution: int = 64):
@@ -174,10 +161,6 @@ class Mono:
         return Point(cx, cy).buffer(radius, resolution=self.res)
 
 
-# -------------------------
-# SVG output
-# -------------------------
-
 def fmt(x: float) -> str:
     return f"{x:.3f}"
 
@@ -212,8 +195,8 @@ def write_svg(out_path: Path, width: float, m: Metrics, g: Geom) -> None:
     d = geom_to_svg_path(g)
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'width="{fmt(width)}" height="{m.H}" '
-        f'viewBox="0 0 {fmt(width)} {m.H}">\n'
+        f'viewBox="0 0 {fmt(width)} {m.H}" '
+        f'width="{fmt(width)}" height="{m.H}">\n'
         f'  <path d="{d}" fill="black" fill-rule="evenodd"/>\n'
         f'</svg>\n'
     )
@@ -255,10 +238,6 @@ img{{width:100%;height:auto;display:block;background:#fff;border-radius:8px}}
     (out_dir / "preview.html").write_text(html, encoding="utf-8")
 
 
-# -------------------------
-# Uppercase
-# -------------------------
-
 def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     W = m.CAP_W
     xL, xR = 130.0, W - 130.0
@@ -272,7 +251,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs: Dict[str, Tuple[Geom, float]] = {}
 
-    # A
     yArch = 260.0
     rArch = (xR - xL) / 2.0
     yBar = 450.0
@@ -283,7 +261,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xL, xR, yBar),
     ), W)
 
-    # B
     bowl_r = (yMid - yTop) / 2.0
     xFlat = 375.0
     glyphs["B"] = (pen.union(
@@ -296,10 +273,8 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xFlat, xL, yBase),
     ), W)
 
-    # C
     glyphs["C"] = (pen.ellipse_arc(CAP_CX, CAP_CY, CAP_RX, CAP_RY, 45.0, 315.0, steps=280), W)
 
-    # D
     xJoin = cx
     glyphs["D"] = (pen.union(
         pen.vline(xL, yTop, yBase),
@@ -308,7 +283,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xJoin, xL, yBase),
     ), W)
 
-    # E / F
     glyphs["E"] = (pen.union(
         pen.vline(xL, yTop, yBase),
         pen.hline(xL, xR, yTop),
@@ -322,7 +296,7 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xL, xR - 70, yMid),
     ), W)
 
-    # G (force connectivity by building as overlapping strokes + union)
+    # G (reverted construction; union pieces so it can't disconnect)
     g_a0 = 300.0
     g_a1 = 60.0
     g_end_y = CAP_CY + 110.0
@@ -330,18 +304,15 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     g_end_sin = max(-1.0, min(1.0, g_end_sin))
     g_a2 = math.degrees(math.asin(g_end_sin))  # ~17°
 
-    arc1 = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a0, g_a1, clockwise=True, steps=220)
-    arc2 = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a1, g_a2, clockwise=True, steps=90)
+    arc1_pts = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a0, g_a1, clockwise=True, steps=220)
+    arc2_pts = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a1, g_a2, clockwise=True, steps=90)
 
-    # Outer curve stroke as its own piece
-    outer = pen.line(arc1 + arc2[1:])
-
-    p0 = arc2[-1]
-    p3 = (CAP_CX + CAP_RX * 0.773, CAP_CY)   # bar start (right-ish)
-    p4 = (CAP_CX + 35.0, CAP_CY)             # bar end   (toward center)
+    p0 = arc2_pts[-1]
+    p3 = (CAP_CX + CAP_RX * 0.773, CAP_CY)   # bar start
+    p4 = (CAP_CX + 35.0, CAP_CY)             # bar end
 
     a = math.radians(g_a2)
-    tvx, tvy = (math.sin(a) * CAP_RX, -math.cos(a) * CAP_RY)
+    tvx, tvy = (math.sin(a) * CAP_RX, -math.cos(a) * CAP_RY)  # clockwise tangent
     ux, uy = norm(tvx, tvy)
 
     tlen1 = CAP_RX * 0.28
@@ -350,15 +321,14 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     p1 = (p0[0] + ux * tlen1, p0[1] + uy * tlen1)
     p2 = (p3[0] + tlen2, p3[1])  # horizontal end tangent into the bar
 
-    bez = cubic_points(p0, p1, p2, p3, steps=70)
+    bez_pts = cubic_points(p0, p1, p2, p3, steps=70)
 
-    # Hook stroke: start a few points back on the ellipse to guarantee overlap -> no disconnection
-    hook_pts = [arc2[-8]] + bez[1:] + [p4]
-    hook = pen.line(hook_pts)
+    g_outer = pen.line(arc1_pts + arc2_pts[1:])
+    g_join  = pen.line(bez_pts)
+    g_bar   = pen.hline(p4[0], p3[0], CAP_CY)
 
-    glyphs["G"] = (pen.union(outer, hook), W)
+    glyphs["G"] = (pen.union(g_outer, g_join, g_bar), W)
 
-    # H / I / J / K / L / M / N
     glyphs["H"] = (pen.union(
         pen.vline(xL, yTop, yBase),
         pen.vline(xR, yTop, yBase),
@@ -396,11 +366,9 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(xL, yTop), (xR, yBase)]),
     ), W)
 
-    # O
     O = pen.ellipse_stroke(CAP_CX, CAP_CY, CAP_RX, CAP_RY)
     glyphs["O"] = (O, W)
 
-    # P / Q / R
     glyphs["P"] = (pen.union(
         pen.vline(xL, yTop, yBase),
         pen.hline(xL, xFlat, yTop),
@@ -416,39 +384,27 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["R"] = (pen.union(glyphs["P"][0], pen.line([(xFlat, yMid), (xR, yBase)])), W)
 
-    # S (scale to match cap width/height; less narrow + not tiny)
-    pad_top = 50.0
-    pad_bot = 50.0
-    ref_y0, ref_y3 = 210.0, 650.0
-    scale_y = (yBase - yTop - (pad_top + pad_bot)) / (ref_y3 - ref_y0)
-    off_y = (yTop + pad_top) - ref_y0 * scale_y
+    # S (less dynamic + full cap height)
+    S_y0 = yTop + 25.0
+    S_y3 = yBase - 25.0
+    S_h = S_y3 - S_y0
+    S_xL = xL + 75.0
+    S_xR = xR - 75.0
+    S_w = S_xR - S_xL
 
-    # widen using ref min/max in X
-    pad_x = 50.0
-    ref_x_min, ref_x_max = 240.0, 460.0
-    target_left = xL + pad_x
-    target_right = xR - pad_x
-    scale_x = (target_right - target_left) / (ref_x_max - ref_x_min)
-    off_x = target_left - ref_x_min * scale_x
+    p0 = (S_xR, S_y0)
+    p1 = (S_xL, S_y0 + S_h * 0.28)
+    p2 = (S_xR, S_y0 + S_h * 0.62)
+    p3 = (S_xL, S_y3)
 
-    def Sy(y_ref: float) -> float:
-        return off_y + y_ref * scale_y
+    c01 = (S_xR - S_w * 0.35, S_y0)
+    c02 = (S_xL,              S_y0 + S_h * 0.12)
 
-    def Sx(x_ref: float) -> float:
-        return off_x + x_ref * scale_x
+    c11 = (S_xL,              S_y0 + S_h * 0.44)
+    c12 = (S_xR,              S_y0 + S_h * 0.38)
 
-    p0 = (Sx(460.0), Sy(210.0))
-    c01 = (Sx(390.0), Sy(210.0))
-    c02 = (Sx(260.0), Sy(255.0))
-    p1 = (Sx(260.0), Sy(335.0))
-
-    c11 = (Sx(260.0), Sy(435.0))
-    c12 = (Sx(440.0), Sy(425.0))
-    p2 = (Sx(440.0), Sy(520.0))
-
-    c21 = (Sx(440.0), Sy(610.0))
-    c22 = (Sx(320.0), Sy(650.0))
-    p3 = (Sx(240.0), Sy(650.0))
+    c21 = (S_xR,              S_y0 + S_h * 0.82)
+    c22 = (S_xL + S_w * 0.35, S_y3)
 
     S_pts = (
         cubic_points(p0, c01, c02, p1, steps=90) +
@@ -457,7 +413,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["S"] = (pen.line(S_pts), W)
 
-    # T/U/V/W/X/Y/Z
     glyphs["T"] = (pen.union(pen.hline(xL, xR, yTop), pen.vline(cx, yTop, yBase)), W)
 
     u_end = 560.0
@@ -479,10 +434,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     return glyphs
 
 
-# -------------------------
-# Lowercase (no uppercase fallback)
-# -------------------------
-
 def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     W = m.LC_W
     xL, xR = 110.0, W - 110.0
@@ -494,15 +445,13 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     yAsc = m.CAP_TOP
     yDesc = m.DESC_END
 
-    # bowl sizes
     rx = (xR - xL) * 0.42
     ry = (yBase - yXTop) * 0.48
     bcX = cx
     bcY = yMid + 10.0
 
-    # dot sizing/placement
-    dot_r = pen.r * 0.80
-    dot_y = yXTop - 165.0
+    dot_r = pen.r * 0.95
+    dot_y = yXTop - 160.0
 
     glyphs: Dict[str, Tuple[Geom, float]] = {}
 
@@ -516,7 +465,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx: float,
         overlap: float = 6.0,
     ) -> Geom:
-        """Guaranteed connected 'D' shape: stem + top/bot connectors + half-ellipse arc."""
         cy = (top_y + bot_y) / 2.0
         by = (bot_y - top_y) / 2.0
 
@@ -534,18 +482,16 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         stem = pen.vline(stem_x, stem_top, stem_bot)
         return pen.union(stem, top_conn, arc, bot_conn)
 
-    # c
     glyphs["c"] = (pen.ellipse_arc(bcX, bcY, rx, ry, 45.0, 315.0, steps=240), W)
 
-    # a (NO horizontal bar; bowl + right stem with overlap)
-    a_rx, a_ry = rx * 0.92, ry * 0.92
-    a_cx, a_cy = bcX - 12.0, bcY
-    a_bowl = pen.ellipse_stroke(a_cx, a_cy, a_rx, a_ry)
-    a_stem_x = a_cx + a_rx * 0.82  # inside the bowl stroke -> guaranteed overlap
-    a_stem = pen.vline(a_stem_x, yXTop + 25.0, yBase - 10.0)
-    glyphs["a"] = (pen.union(a_bowl, a_stem), W)
+    # a: one curve + one straight; stem moved right
+    a_rx, a_ry = rx * 0.95, ry * 0.95
+    a_cx, a_cy = bcX - 35.0, bcY
+    a_curve = pen.ellipse_arc(a_cx, a_cy, a_rx, a_ry, 45.0, 315.0, steps=260)
+    a_stem_x = a_cx + a_rx * 1.02
+    a_stem = pen.vline(a_stem_x, yXTop + 20.0, yBase - 10.0)
+    glyphs["a"] = (pen.union(a_curve, a_stem), W)
 
-    # b (connected D-shape bowl on right)
     b_stem_x = xL + 40.0
     b_top = yXTop + 15.0
     b_bot = yBase - 10.0
@@ -556,7 +502,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=b_rx, overlap=10.0,
     ), W)
 
-    # d (connected D-shape bowl on left)
     d_stem_x = xR - 40.0
     d_top = yXTop + 15.0
     d_bot = yBase - 10.0
@@ -567,65 +512,44 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=d_rx, overlap=10.0,
     ), W)
 
-    # e ("3"): closed loop + right-side gap + bar into the gap
-    e_loop = pen.ellipse_stroke(bcX, bcY, rx, ry)
-    gap_w = pen.stroke * 0.90
-    gap_h = pen.stroke * 1.25
-    gap_cx = bcX + rx * 0.98  # right edge area
-    gap = Polygon([
-        (gap_cx - gap_w/2, bcY - gap_h/2),
-        (gap_cx + gap_w/2, bcY - gap_h/2),
-        (gap_cx + gap_w/2, bcY + gap_h/2),
-        (gap_cx - gap_w/2, bcY + gap_h/2),
-    ])
-    e_outer = pen._fix(e_loop.difference(gap))
-    e_bar = pen.hline(bcX - rx * 0.85, bcX + rx * 0.96, bcY)
-    glyphs["e"] = (pen.union(e_outer, e_bar), W)
+    # e: make bar connect
+    e_arc = pen.ellipse_arc(bcX, bcY, rx, ry, 35.0, 325.0, steps=280)
+    e_bar = pen.hline(bcX - rx * 1.05, bcX + rx * 0.65, bcY)
+    glyphs["e"] = (pen.union(e_arc, e_bar), W)
 
-    # f (leave as-is here; not part of this specific fix-list)
+    # f: rounder top hook
     fx = cx - 65.0
     f_top = yAsc + 10.0
     f_bot = yBase - 10.0
     f_cross_y = yXTop + 105.0
-    f = pen.union(
-        pen.vline(fx, f_top, f_bot),
-        pen.hline(fx, fx + 265.0, f_cross_y),
-        pen.hline(fx, fx + 85.0, f_top + 55.0),
-    )
-    glyphs["f"] = (f, W)
+    f_stem = pen.vline(fx, f_top, f_bot)
+    f_cross = pen.hline(fx - 10.0, fx + 265.0, f_cross_y)
+    f_hook  = pen.line([(fx, f_top + 20.0), (fx + 95.0, f_top + 20.0), (fx + 95.0, f_top + 75.0)])
+    glyphs["f"] = (pen.union(f_stem, f_cross, f_hook), W)
 
-    # g (NO horizontal bar; bowl + right descender + hook)
-    g_bowl = pen.ellipse_stroke(bcX - 10.0, bcY - 10.0, rx * 0.88, ry * 0.88)
-    g_stem_x = (bcX - 10.0) + (rx * 0.88) * 0.86  # overlap into bowl
-    g_stem_y0 = bcY - 10.0 + (ry * 0.88) * 0.10
+    # g: no bar + stem moved right
+    g_cx, g_cy = bcX - 20.0, bcY - 10.0
+    g_rx, g_ry = rx * 0.88, ry * 0.88
+    g_bowl = pen.ellipse_stroke(g_cx, g_cy, g_rx, g_ry)
+    g_stem_x = g_cx + g_rx * 0.98
+    g_stem_y0 = g_cy + g_ry * 0.20
     g_stem_y1 = yDesc - 70.0
     g_stem = pen.vline(g_stem_x, g_stem_y0, g_stem_y1)
-    g_hook = pen.arc(g_stem_x - 115.0, g_stem_y1, 115.0, 0.0, 180.0, steps=180)
+    g_hook = pen.arc(g_stem_x - 120.0, g_stem_y1, 120.0, 0.0, 180.0, steps=180)
     glyphs["g"] = (pen.union(g_bowl, g_stem, g_hook), W)
 
-    # h (rounded top-right corner via single polyline corner)
+    # h: rounded shoulder bend (polyline)
     hxL = xL + 40.0
     hxR = xR - 40.0
     h_top_y = yXTop + 20.0
-    h_corner = pen.line([(hxL, h_top_y), (hxR, h_top_y), (hxR, yBase)])
-    glyphs["h"] = (pen.union(
-        pen.vline(hxL, yAsc, yBase),
-        h_corner,
-    ), W)
+    h_left = pen.vline(hxL, yAsc, yBase)
+    h_shoulder = pen.line([(hxL, h_top_y), (hxR, h_top_y), (hxR, yBase)])
+    glyphs["h"] = (pen.union(h_left, h_shoulder), W)
 
-    # i / j
     ix = cx
-    glyphs["i"] = (pen.union(
-        pen.vline(ix, yXTop + 20.0, yBase),
-        pen.dot(ix, dot_y, dot_r),
-    ), W)
+    glyphs["i"] = (pen.union(pen.vline(ix, yXTop + 20.0, yBase), pen.dot(ix, dot_y, dot_r)), W)
+    glyphs["j"] = (pen.union(pen.vline(ix, yXTop + 20.0, yDesc - 10.0), pen.dot(ix, dot_y, dot_r)), W)
 
-    glyphs["j"] = (pen.union(
-        pen.vline(ix, yXTop + 20.0, yDesc - 10.0),
-        pen.dot(ix, dot_y, dot_r),
-    ), W)
-
-    # k
     kx = xL + 40.0
     ky_mid = (yXTop + yBase) / 2.0
     glyphs["k"] = (pen.union(
@@ -634,46 +558,33 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(kx, ky_mid), (xR - 10.0, yBase - 20.0)]),
     ), W)
 
-    # l
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
-    # m (wider; rounded top-right corners on the arches)
-    m_left = 80.0
-    m_right = W - 80.0
-    m_x1 = m_left
-    m_x2 = cx
-    m_x3 = m_right
+    # m: wider + rounded shoulders
+    m_x1 = xL + 20.0
+    m_x2 = cx - 5.0
+    m_x3 = xR - 20.0
     m_top = yXTop + 20.0
-    m_arch1 = pen.line([(m_x1, m_top), (m_x2, m_top), (m_x2, yBase)])
-    m_arch2 = pen.line([(m_x2, m_top), (m_x3, m_top), (m_x3, yBase)])
-    glyphs["m"] = (pen.union(
-        pen.vline(m_x1, m_top, yBase),
-        pen.vline(m_x2, m_top, yBase),
-        pen.vline(m_x3, m_top, yBase),
-        m_arch1,
-        m_arch2,
-    ), W)
+    m1 = pen.line([(m_x1, yBase), (m_x1, m_top), (m_x2, m_top), (m_x2, yBase)])
+    m2 = pen.line([(m_x2, yBase), (m_x2, m_top), (m_x3, m_top), (m_x3, yBase)])
+    glyphs["m"] = (pen.union(m1, m2), W)
 
-    # n (rounded top-right corner like h)
+    # n: rounded shoulder
     n_x1 = xL + 40.0
     n_x2 = xR - 40.0
     n_top = yXTop + 20.0
-    n_corner = pen.line([(n_x1, n_top), (n_x2, n_top), (n_x2, yBase)])
-    glyphs["n"] = (pen.union(
-        pen.vline(n_x1, n_top, yBase),
-        n_corner,
-    ), W)
+    n_shape = pen.line([(n_x1, yBase), (n_x1, n_top), (n_x2, n_top), (n_x2, yBase)])
+    glyphs["n"] = (n_shape, W)
 
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
-    # p / q
     p_stem_x = xL + 40.0
     p_top = yXTop + 15.0
     p_bot = yBase - 10.0
     p_rx = (xR - p_stem_x) * 0.52
     glyphs["p"] = (dshape_stem_bowl(
         stem_x=p_stem_x, top_y=p_top, bot_y=p_bot,
-        side="right", stem_top=p_top, stem_bot=yDesc - 10.0,
+        side="right", stem_top=p_top, stem_bot=m.DESC_END - 10.0,
         bowl_rx=p_rx, overlap=10.0,
     ), W)
 
@@ -683,102 +594,87 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     q_rx = (q_stem_x - xL) * 0.52
     glyphs["q"] = (dshape_stem_bowl(
         stem_x=q_stem_x, top_y=q_top, bot_y=q_bot,
-        side="left", stem_top=q_top, stem_bot=yDesc - 10.0,
+        side="left", stem_top=q_top, stem_bot=m.DESC_END - 10.0,
         bowl_rx=q_rx, overlap=10.0,
     ), W)
 
-    # r (extend shoulder further right)
+    # r: closer to your source
     rx_stem = xL + 40.0
     r_top = yXTop + 20.0
-    glyphs["r"] = (pen.line([
-        (rx_stem, yBase),
-        (rx_stem, r_top),
-        (rx_stem + 260.0, r_top),
-    ]), W)
+    r_stem = pen.vline(rx_stem, r_top, yBase)
+    r_arm_y = r_top + 60.0
+    r_arm_x2 = rx_stem + 190.0
+    r_arm = pen.hline(rx_stem, r_arm_x2, r_arm_y)
+    r_drop = pen.vline(r_arm_x2, r_arm_y, r_arm_y + 70.0)
+    glyphs["r"] = (pen.union(r_stem, r_arm, r_drop), W)
 
-    # s
-    s_rx_l = (xR - xL) * 0.42
-    s_cx_l = cx
-    s0 = (s_cx_l + s_rx_l * 0.50, yXTop + 70.0)
-    s1 = (s_cx_l - s_rx_l * 0.409, yXTop + 165.0)
-    s2 = (s_cx_l + s_rx_l * 0.409, yXTop + 310.0)
-    s3 = (s_cx_l - s_rx_l * 0.50,  yXTop + 395.0)
+    # s: less dynamic + not tiny
+    s_y0 = yXTop + 35.0
+    s_y3 = yBase - 25.0
+    s_h = s_y3 - s_y0
+    s_xL = xL + 90.0
+    s_xR = xR - 90.0
+    s_w = s_xR - s_xL
 
-    c01 = (s_cx_l + s_rx_l * 0.182, yXTop + 70.0)
-    c02 = (s_cx_l - s_rx_l * 0.409, yXTop + 105.0)
+    sp0 = (s_xR, s_y0)
+    sp1 = (s_xL, s_y0 + s_h * 0.30)
+    sp2 = (s_xR, s_y0 + s_h * 0.64)
+    sp3 = (s_xL, s_y3)
 
-    c11 = (s_cx_l - s_rx_l * 0.409, yXTop + 235.0)
-    c12 = (s_cx_l + s_rx_l * 0.409, yXTop + 225.0)
-
-    c21 = (s_cx_l + s_rx_l * 0.409, yXTop + 360.0)
-    c22 = (s_cx_l - s_rx_l * 0.136, yXTop + 395.0)
+    sc01 = (s_xR - s_w * 0.33, s_y0)
+    sc02 = (s_xL,              s_y0 + s_h * 0.12)
+    sc11 = (s_xL,              s_y0 + s_h * 0.46)
+    sc12 = (s_xR,              s_y0 + s_h * 0.40)
+    sc21 = (s_xR,              s_y0 + s_h * 0.84)
+    sc22 = (s_xL + s_w * 0.33, s_y3)
 
     s_pts = (
-        cubic_points(s0, c01, c02, s1, steps=70) +
-        cubic_points(s1, c11, c12, s2, steps=70)[1:] +
-        cubic_points(s2, c21, c22, s3, steps=70)[1:]
+        cubic_points(sp0, sc01, sc02, sp1, steps=80) +
+        cubic_points(sp1, sc11, sc12, sp2, steps=80)[1:] +
+        cubic_points(sp2, sc21, sc22, sp3, steps=80)[1:]
     )
     glyphs["s"] = (pen.line(s_pts), W)
 
-    # t
-    tx = cx - 20.0
+    # t: stem on right
+    tx = cx + 85.0
     t_cross_y = yXTop + 105.0
     glyphs["t"] = (pen.union(
         pen.vline(tx, yAsc + 10.0, yBase),
-        pen.hline(tx - 130.0, tx + 170.0, t_cross_y),
+        pen.hline(tx - 300.0, tx + 60.0, t_cross_y),
     ), W)
 
-    # u (apply same “corner family” feel by making a single continuous U stroke)
+    # u: no bottom arc; aligned baseline
     ux1 = xL + 50.0
     ux2 = xR - 50.0
-    u_top = yXTop + 55.0
-    u_bot = yBase
-    u_mid_x = (ux1 + ux2) / 2.0
-    u_r = (ux2 - ux1) / 2.0
-    arc_pts = ellipse_arc_points(u_mid_x, u_bot, u_r, u_r, 180.0, 0.0, clockwise=True, steps=150)
-    u_pts = [(ux1, u_top), (ux1, u_bot)] + arc_pts[1:] + [(ux2, u_top)]
-    glyphs["u"] = (pen.line(u_pts), W)
+    u_top = yXTop + 20.0
+    u_bot = yBase - 10.0
+    glyphs["u"] = (pen.line([(ux1, u_top), (ux1, u_bot), (ux2, u_bot), (ux2, u_top)]), W)
 
-    # v
     glyphs["v"] = (pen.line([(xL + 60.0, yXTop + 20.0), (cx, yBase), (xR - 60.0, yXTop + 20.0)]), W)
 
-    # w (source-like “ш” w; wider)
-    w_left = 80.0
-    w_right = W - 80.0
-    w_x1 = w_left
-    w_x2 = cx
-    w_x3 = w_right
-    w_top = yXTop + 55.0
-    w_bot = yBase
-    w_geom = pen.union(
-        pen.vline(w_x1, w_top, w_bot),
-        pen.vline(w_x2, w_top, w_bot),
-        pen.vline(w_x3, w_top, w_bot),
-        pen.hline(w_x1, w_x3, w_bot),
-    )
-    glyphs["w"] = (w_geom, W)
+    # w: wider + rounded bend
+    wx1 = xL + 20.0
+    wx2 = cx
+    wx3 = xR - 20.0
+    w_top = yXTop + 20.0
+    w_bot = yBase - 10.0
+    w_outer = pen.line([(wx1, w_top), (wx1, w_bot), (wx3, w_bot), (wx3, w_top)])
+    w_mid = pen.vline(wx2, w_top, w_bot)
+    glyphs["w"] = (pen.union(w_outer, w_mid), W)
 
-    # x
     x1 = xL + 55.0
     x2 = xR - 55.0
     x_top = yXTop + 30.0
     x_bot = yBase - 10.0
-    glyphs["x"] = (pen.union(
-        pen.line([(x1, x_top), (x2, x_bot)]),
-        pen.line([(x2, x_top), (x1, x_bot)]),
-    ), W)
+    glyphs["x"] = (pen.union(pen.line([(x1, x_top), (x2, x_bot)]), pen.line([(x2, x_top), (x1, x_bot)])), W)
 
-    # y (more like h-family: top bar into right descender)
-    yx1 = xL + 60.0
-    yx2 = xR - 60.0
+    # y: like u but with right descender (avoid weird V-ish look)
+    yx1 = xL + 50.0
+    yx2 = xR - 50.0
     y_top = yXTop + 20.0
-    y_corner = pen.line([(yx1, y_top), (yx2, y_top), (yx2, yDesc - 10.0)])
-    glyphs["y"] = (pen.union(
-        pen.vline(yx1, y_top, yBase),
-        y_corner,
-    ), W)
+    y_bot = yBase - 10.0
+    glyphs["y"] = (pen.line([(yx1, y_top), (yx1, y_bot), (yx2, y_bot), (yx2, yDesc - 10.0)]), W)
 
-    # z
     z_top = yXTop + 30.0
     z_bot = yBase - 10.0
     glyphs["z"] = (pen.union(
@@ -792,10 +688,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     return glyphs
 
-
-# -------------------------
-# Main
-# -------------------------
 
 def main() -> None:
     ap = argparse.ArgumentParser()
