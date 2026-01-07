@@ -3,7 +3,7 @@
   "type": "cakephp-plugin",
   "autoload": {
     "psr-4": {
-      "Mmxx\\": "src/"
+      "Ligatureluurs\\": "src/"
     }
   }
 }
