@@ -581,15 +581,33 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     e_pts = [bar_start, bar_end] + arc_pts[1:]
     glyphs["e"] = (pen.line(e_pts), W)
 
-    # f: rounder top hook
+    # f: smooth rounded top hook + short rightward crossbar (closer to reference)
     fx = cx - 65.0
     f_top = yAsc + 10.0
     f_bot = yBase - 10.0
-    f_cross_y = yXTop + 105.0
+
+    # main stem
     f_stem = pen.vline(fx, f_top, f_bot)
-    f_cross = pen.hline(fx - 10.0, fx + 265.0, f_cross_y)
-    f_hook  = pen.line([(fx, f_top + 20.0), (fx + 95.0, f_top + 20.0), (fx + 95.0, f_top + 75.0)])
-    glyphs["f"] = (pen.union(f_stem, f_cross, f_hook), W)
+
+    # top hook: an elliptical arc starting on the stem (leftmost point) and curving to the right/down
+    hook_cx = fx + 110.0
+    hook_cy = f_top + 35.0
+    hook_rx = 110.0
+    hook_ry = 50.0
+    hook_pts = ellipse_arc_points(
+        hook_cx, hook_cy, hook_rx, hook_ry,
+        180.0, 25.0,
+        clockwise=False,
+        steps=120
+    )
+    f_hook = pen.line(hook_pts)
+
+    # short crossbar, mostly to the right (no left extension)
+    f_cross_y = yXTop + 110.0
+    f_cross = pen.hline(fx, fx + 235.0, f_cross_y)
+
+    glyphs["f"] = (pen.union(f_stem, f_hook, f_cross), W)
+
 
     # g: no bar + stem moved right
     g_cx, g_cy = bcX - 20.0, bcY - 10.0
