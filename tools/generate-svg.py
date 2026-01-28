@@ -512,10 +512,34 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=d_rx, overlap=10.0,
     ), W)
 
-    # e: make bar connect
-    e_arc = pen.ellipse_arc(bcX, bcY, rx, ry, 35.0, 325.0, steps=280)
-    e_bar = pen.hline(bcX - rx * 1.05, bcX + rx * 0.65, bcY)
-    glyphs["e"] = (pen.union(e_arc, e_bar), W)
+    # e (single continuous stroke: bar -> long ellipse arc)
+    # Matches the approved SVG: M bar_start -> bar_end then a large arc around to lower-right.
+    e_cx, e_cy = bcX, bcY
+    e_rx, e_ry = rx, ry
+
+    # Place the bar a bit above the ellipse center (works nicely with your metrics)
+    e_bar_y = yXTop + 180.0
+
+    # Compute the corresponding ellipse angle on the RIGHT side for that y (so bar end lies on the ellipse)
+    s = (e_bar_y - e_cy) / e_ry
+    s = max(-1.0, min(1.0, s))
+    a_start = math.degrees(math.asin(s)) % 360.0  # near 340–360 degrees typically
+
+    # End angle down on the right side (gives the “open below” feel)
+    a_end = 70.0
+
+    bar_end = ellipse_point(e_cx, e_cy, e_rx, e_ry, a_start)
+    bar_start = (e_cx - e_rx * 0.56, e_bar_y)
+
+    arc_pts = ellipse_arc_points(
+        e_cx, e_cy, e_rx, e_ry,
+        a_start, a_end,
+        clockwise=True,   # take the long way around (large arc)
+        steps=220
+    )
+
+    e_pts = [bar_start, bar_end] + arc_pts[1:]
+    glyphs["e"] = (pen.line(e_pts), W)
 
     # f: rounder top hook
     fx = cx - 65.0
