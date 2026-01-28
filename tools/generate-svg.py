@@ -484,13 +484,53 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["c"] = (pen.ellipse_arc(bcX, bcY, rx, ry, 45.0, 315.0, steps=240), W)
 
-    # a: one curve + one straight; stem moved right
-    a_rx, a_ry = rx * 0.95, ry * 0.95
-    a_cx, a_cy = bcX - 35.0, bcY
-    a_curve = pen.ellipse_arc(a_cx, a_cy, a_rx, a_ry, 45.0, 315.0, steps=260)
-    a_stem_x = a_cx + a_rx * 1.02
-    a_stem = pen.vline(a_stem_x, yXTop + 20.0, yBase - 10.0)
-    glyphs["a"] = (pen.union(a_curve, a_stem), W)
+    # a: one continuous stroke (terminal + stem + bowl + bar)
+    # Matches the latest SVG path we settled on.
+    a_p0  = (146.0, 400.0)
+
+    # terminal into stem
+    a_c01 = (205.0, 320.0)
+    a_c02 = (265.0, 310.0)
+    a_p1  = (312.0, 315.0)
+
+    a_c11 = (345.0, 318.0)
+    a_c12 = (360.0, 335.0)
+    a_p2  = (360.0, 360.0)
+
+    seg0 = cubic_points(a_p0, a_c01, a_c02, a_p1, steps=50)
+    seg1 = cubic_points(a_p1, a_c11, a_c12, a_p2, steps=30)
+
+    # straight down stem, then bottom bar to the left
+    stem_down = [(360.0, 770.0)]
+    bottom_in = [(256.0, 770.0)]
+
+    # left bowl back up to the bar (two cubic segments)
+    a_p3  = (146.0, 665.0)
+    a_c21 = (195.25, 770.0)
+    a_c22 = (146.0, 723.0)
+
+    a_p4  = (256.0, 560.0)
+    a_c31 = (146.0, 607.0)
+    a_c32 = (195.25, 560.0)
+
+    seg2 = cubic_points(bottom_in[-1], a_c21, a_c22, a_p3, steps=35)
+    seg3 = cubic_points(a_p3, a_c31, a_c32, a_p4, steps=35)
+
+    # bar back to the stem
+    bar_out = [(360.0, 560.0)]
+
+    a_pts = (
+        seg0 +
+        seg1[1:] +
+        stem_down +
+        bottom_in +
+        seg2[1:] +
+        seg3[1:] +
+        bar_out
+    )
+
+    glyphs["a"] = (pen.line(a_pts), W)
+
 
     b_stem_x = xL + 40.0
     b_top = yXTop + 15.0
