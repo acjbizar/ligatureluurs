@@ -789,12 +789,24 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     x_bot = yBase - 10.0
     glyphs["x"] = (pen.union(pen.line([(x1, x_top), (x2, x_bot)]), pen.line([(x2, x_top), (x1, x_bot)])), W)
 
-    # y: like u but with right descender (avoid weird V-ish look)
+    # y: like "u", but the RIGHT stem continues down into a descender (like p/q)
     yx1 = xL + 50.0
     yx2 = xR - 50.0
     y_top = yXTop + 20.0
     y_bot = yBase - 10.0
-    glyphs["y"] = (pen.line([(yx1, y_top), (yx1, y_bot), (yx2, y_bot), (yx2, yDesc - 10.0)]), W)
+
+    # match the p/q descender logic you liked (no clamp)
+    desc_len = (yXTop - yAsc)
+    y_desc_bot = yBase + desc_len
+
+    y_shape = pen.union(
+        pen.vline(yx1, y_top, y_bot),        # left stem
+        pen.hline(yx1, yx2, y_bot),          # bottom
+        pen.vline(yx2, y_top, y_desc_bot),   # right stem + descender
+    )
+
+    glyphs["y"] = (y_shape, W)
+
 
     z_top = yXTop + 30.0
     z_bot = yBase - 10.0
