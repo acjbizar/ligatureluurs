@@ -498,18 +498,24 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["3"] = (pen.union(three_top, three_mid, three_bot, upper_loop, lower_loop), W)
 
-    # ------------------------------------------------------------------
-    # 4  (fix: remove left stem — it was reading like “N”)
-    # Diagonal + crossbar + right stem.
-    # ------------------------------------------------------------------
-    x4_stem = xR - 120.0
-    y4_cross = yMid + 20.0
+    # 4 (proper open-four: triangle + crossbar; no dagger/arrow junctions)
+    x4_stem  = xR - 120.0
+    y4_cross = yMid + 45.0
 
-    four_diag  = pen.line([(xL + 140.0, yTop + 90.0), (x4_stem, y4_cross)])
-    four_bar   = pen.hline(xL + 90.0, xR - 40.0, y4_cross)
-    four_stem  = pen.vline(x4_stem, yTop, yBase)
+    # left “leg” of the 4: short and clearly separated from the main stem
+    x4_left  = xL + 230.0
+    y4_top   = yTop + 140.0
 
-    glyphs["4"] = (pen.union(four_diag, four_bar, four_stem), W)
+    # diagonal meets the crossbar BEFORE the stem (so it doesn’t form a fat + junction)
+    x4_knee  = x4_stem - 190.0
+
+    four_left = pen.vline(x4_left, y4_top, y4_cross)
+    four_diag = pen.line([(x4_left, y4_top), (x4_knee, y4_cross)])
+    four_bar  = pen.hline(x4_left, x4_stem, y4_cross)
+    four_stem = pen.vline(x4_stem, yTop, yBase)
+
+    glyphs["4"] = (pen.union(four_left, four_diag, four_bar, four_stem), W)
+
 
     # ------------------------------------------------------------------
     # 5  (fix: bottom must be a real bowl tied to midline, not a blob)
@@ -537,34 +543,34 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    # ------------------------------------------------------------------
-    # 6  (fix: stop looking like “0 + hat” / “e”)
-    # Closed lower bowl + spiral tail that joins bowl upper-left.
-    # ------------------------------------------------------------------
-    six_cx = cx + 20.0
-    six_cy = yMid + 170.0
-    six_rx = rx * 0.86
-    six_ry = ry * 0.70
+    # 6 (proper: closed bowl + tangential tail joining upper-left; no inner bar)
+    six_cx = cx + 12.0
+    six_cy = yMid + 175.0
+    six_rx = rx * 0.84
+    six_ry = ry * 0.74
 
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
-    # join on upper-left of bowl
-    join = ellipse_point(six_cx, six_cy, six_rx, six_ry, 210.0)
+    # join the tail on the upper-left of the bowl
+    join_deg = 230.0
+    join = ellipse_point(six_cx, six_cy, six_rx, six_ry, join_deg)
 
-    # tail starts upper-right, curls into the bowl (not a “hat”)
-    start = (xR - 110.0, yTop + 140.0)
-    c1 = (xR - 260.0, yTop + 40.0)
-    c2 = (six_cx - six_rx * 1.10, six_cy - six_ry * 0.55)
-    tail_pts = cubic_points(start, c1, c2, join, steps=100)
+    # tangent direction on ellipse at join (for a smooth merge)
+    t = math.radians(join_deg)
+    tvx = -six_rx * math.sin(t)
+    tvy =  six_ry * math.cos(t)
+    ux, uy = norm(tvx, tvy)
+
+    # tail starts top-right-ish, curls into the bowl
+    p0 = (xR - 150.0, yTop + 105.0)
+    p1 = (xR - 340.0, yTop + 10.0)
+    p2 = (join[0] - ux * 190.0, join[1] - uy * 190.0)  # approach join tangentially
+    p3 = join
+
+    tail_pts = cubic_points(p0, p1, p2, p3, steps=120)
     six_tail = pen.line(tail_pts)
 
-    # small inward “bite” to force the 6 reading (short, low, not an e-bar)
-    six_hint = pen.line([
-        (six_cx + six_rx * 0.15, six_cy + six_ry * 0.10),
-        (six_cx + six_rx * 0.55, six_cy + six_ry * 0.10),
-    ])
-
-    glyphs["6"] = (pen.union(six_bowl, six_tail, six_hint), W)
+    glyphs["6"] = (pen.union(six_bowl, six_tail), W)
 
     # 7
     glyphs["7"] = (pen.union(
