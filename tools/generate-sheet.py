@@ -55,8 +55,9 @@ def fmt(x: float) -> str:
 
 
 def codepoint_filename(s: str) -> str:
-    cps = [f"U{ord(ch):04X}" for ch in s]
-    return "_".join(cps) + ".svg"
+    cps = [f"u{ord(ch):04x}" for ch in s]  # lowercase u + lowercase hex
+    code = "_".join(cps)
+    return f"character-{code}.svg"
 
 
 def parse_glyph_svg(path: Path) -> Optional[Tuple[float, float, str]]:
