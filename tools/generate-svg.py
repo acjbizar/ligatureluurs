@@ -717,13 +717,24 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["s"] = (pen.line(s_pts), W)
 
-    # t: stem on right
+    # t: high crossbar, mostly to the RIGHT (matches reference)
     tx = cx + 85.0
-    t_cross_y = yXTop + 105.0
+
+    t_top = yAsc + 10.0
+    t_bot = yBase - 10.0
+
+    # crossbar sits relatively high
+    t_cross_y = yXTop + 60.0
+
+    # bar starts at the stem and goes right (optionally tiny left overhang)
+    t_left  = tx            # use tx - 15.0 if you want a hair to the left
+    t_right = tx + 220.0
+
     glyphs["t"] = (pen.union(
-        pen.vline(tx, yAsc + 10.0, yBase),
-        pen.hline(tx - 300.0, tx + 60.0, t_cross_y),
+        pen.vline(tx, t_top, t_bot),
+        pen.hline(t_left, t_right, t_cross_y),
     ), W)
+
 
     # u: no bottom arc; aligned baseline
     ux1 = xL + 50.0
