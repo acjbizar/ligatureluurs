@@ -642,14 +642,29 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
-    # m: wider + rounded shoulders
-    m_x1 = xL + 20.0
-    m_x2 = cx - 5.0
-    m_x3 = xR - 20.0
+    # --- helper: aperture width used by "n" (so we can match it) ---
+    n_aperture = (xR - 40.0) - (xL + 40.0)  # n_x2 - n_x1
+
+    # m: wider (adds one extra n-aperture), apertures match "n"
+    Wm = W + n_aperture
+    xLm, xRm = 110.0, Wm - 110.0
+
+    m_x1 = xLm + 40.0
+    m_x2 = m_x1 + n_aperture
+    m_x3 = m_x2 + n_aperture
     m_top = yXTop + 20.0
-    m1 = pen.line([(m_x1, yBase), (m_x1, m_top), (m_x2, m_top), (m_x2, yBase)])
-    m2 = pen.line([(m_x2, yBase), (m_x2, m_top), (m_x3, m_top), (m_x3, yBase)])
-    glyphs["m"] = (pen.union(m1, m2), W)
+
+    # single continuous stroke (up, over, down, up, over, down)
+    m_pts = [
+        (m_x1, yBase),
+        (m_x1, m_top),
+        (m_x2, m_top),
+        (m_x2, yBase),
+        (m_x2, m_top),
+        (m_x3, m_top),
+        (m_x3, yBase),
+    ]
+    glyphs["m"] = (pen.line(m_pts), Wm)
 
     # n: rounded shoulder
     n_x1 = xL + 40.0
@@ -745,15 +760,20 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["v"] = (pen.line([(xL + 60.0, yXTop + 20.0), (cx, yBase), (xR - 60.0, yXTop + 20.0)]), W)
 
-    # w: wider + rounded bend
-    wx1 = xL + 20.0
-    wx2 = cx
-    wx3 = xR - 20.0
+    # w: wider (adds one extra n-aperture), apertures match "n"
+    Ww = W + n_aperture
+    xLw, xRw = 110.0, Ww - 110.0
+
+    wx1 = xLw + 40.0
+    wx2 = wx1 + n_aperture
+    wx3 = wx2 + n_aperture
     w_top = yXTop + 20.0
     w_bot = yBase - 10.0
+
+    # keep your existing "boxy w" construction, just widened + matched apertures
     w_outer = pen.line([(wx1, w_top), (wx1, w_bot), (wx3, w_bot), (wx3, w_top)])
     w_mid = pen.vline(wx2, w_top, w_bot)
-    glyphs["w"] = (pen.union(w_outer, w_mid), W)
+    glyphs["w"] = (pen.union(w_outer, w_mid), Ww)
 
     x1 = xL + 55.0
     x2 = xR - 55.0
