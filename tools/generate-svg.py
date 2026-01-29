@@ -498,23 +498,19 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["3"] = (pen.union(three_top, three_mid, three_bot, upper_loop, lower_loop), W)
 
-    # 4 (proper open-four: triangle + crossbar; no dagger/arrow junctions)
+    # 4 (single diagonal from leftmost crossbar point to top of stem)
     x4_stem  = xR - 120.0
-    y4_cross = yMid + 45.0
+    y4_top   = yTop + 20.0          # “topmost point” of the stem for the 4
+    y4_bot   = yBase                # stem goes to baseline
+    y4_cross = yMid + 40.0          # crossbar height
 
-    # left “leg” of the 4: short and clearly separated from the main stem
-    x4_left  = xL + 230.0
-    y4_top   = yTop + 140.0
+    x4_left  = xL + 50.0            # “most left point” of the crossbar
 
-    # diagonal meets the crossbar BEFORE the stem (so it doesn’t form a fat + junction)
-    x4_knee  = x4_stem - 190.0
-
-    four_left = pen.vline(x4_left, y4_top, y4_cross)
-    four_diag = pen.line([(x4_left, y4_top), (x4_knee, y4_cross)])
+    four_stem = pen.vline(x4_stem, y4_top, y4_bot)
     four_bar  = pen.hline(x4_left, x4_stem, y4_cross)
-    four_stem = pen.vline(x4_stem, yTop, yBase)
+    four_diag = pen.line([(x4_left, y4_cross), (x4_stem, y4_top)])
 
-    glyphs["4"] = (pen.union(four_left, four_diag, four_bar, four_stem), W)
+    glyphs["4"] = (pen.union(four_stem, four_bar, four_diag), W)
 
 
     # ------------------------------------------------------------------
