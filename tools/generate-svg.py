@@ -435,12 +435,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
 
 def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
-    """
-    Lining digits built on the same cap metrics as uppercase:
-    - width = CAP_W
-    - top = CAP_TOP, baseline = BASE
-    - monoline construction via pen.line/arc/ellipse_* + cubics where needed
-    """
     W = m.CAP_W
     xL, xR = 130.0, W - 130.0
     cx = W / 2.0
@@ -451,144 +445,140 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs: Dict[str, Tuple[Geom, float]] = {}
 
-    # 0: like O
+    # 0
     glyphs["0"] = (pen.ellipse_stroke(cx, yMid, rx, ry), W)
 
-    # 1: stem + base + small top flick
+    # 1
     one_x = cx + 30.0
-    one_stem = pen.vline(one_x, yTop + 20.0, yBase)
-    one_base = pen.hline(one_x - 110.0, one_x + 90.0, yBase)
-    one_flick = pen.line([(one_x - 60.0, yTop + 90.0), (one_x, yTop + 20.0)])
-    glyphs["1"] = (pen.union(one_stem, one_base, one_flick), W)
+    glyphs["1"] = (pen.union(
+        pen.vline(one_x, yTop + 20.0, yBase),
+        pen.hline(one_x - 110.0, one_x + 90.0, yBase),
+        pen.line([(one_x - 60.0, yTop + 90.0), (one_x, yTop + 20.0)]),
+    ), W)
 
-    # 2: top arc + diagonal + base
+    # 2
     yArc = yTop + 200.0
     rArc = (xR - xL) / 2.0
-    two_top = pen.arc(cx, yArc, rArc, 180.0, 360.0, steps=180)
-    two_diag = pen.line([(xR, yArc), (xL, yBase)])
-    two_base = pen.hline(xL, xR, yBase)
-    glyphs["2"] = (pen.union(two_top, two_diag, two_base), W)
+    glyphs["2"] = (pen.union(
+        pen.arc(cx, yArc, rArc, 180.0, 360.0, steps=180),
+        pen.line([(xR, yArc), (xL, yBase)]),
+        pen.hline(xL, xR, yBase),
+    ), W)
 
-    # ------------------------------------------------------------
-    # 3: REMOVE the “B spine” feel → use a continuous “double-bowl”
-    # curve (S-like) that starts/ends on the right, bulges left.
-    # ------------------------------------------------------------
-    three_xL = xL + 90.0
-    three_xR = xR - 60.0
-    three_y0 = yTop + 70.0
-    three_y3 = yBase - 70.0
-    three_h = three_y3 - three_y0
-    three_w = three_xR - three_xL
+    # ------------------------------------------------------------------
+    # 3  (fix: no S-wiggle; no B-spine)
+    # Three horizontals + two RIGHT half-ellipses connecting them.
+    # ------------------------------------------------------------------
+    y3_top = yTop + 80.0
+    y3_mid = yMid
+    y3_bot = yBase - 60.0
 
-    p0 = (three_xR, three_y0)
-    p1 = (three_xL, three_y0 + three_h * 0.30)
-    p2 = (three_xR - 10.0, yMid)
-    p3 = (three_xL, three_y0 + three_h * 0.70)
-    p4 = (three_xR, three_y3)
+    x3_left = xL + 110.0
+    x3_join = xR - 200.0          # where bars meet the right “loop”
+    bulge3  = 220.0               # how far the loop bulges right
 
-    c01 = (three_xR - three_w * 0.35, three_y0)
-    c02 = (three_xL,               three_y0 + three_h * 0.10)
+    # bars
+    three_top = pen.hline(x3_left, x3_join, y3_top)
+    three_mid = pen.hline(x3_left + 50.0, x3_join, y3_mid)
+    three_bot = pen.hline(x3_left, x3_join, y3_bot)
 
-    c11 = (three_xL,               three_y0 + three_h * 0.42)
-    c12 = (three_xR,               three_y0 + three_h * 0.30)
+    # right-half loops (start/end at x3_join, bulge right)
+    cy_u = (y3_top + y3_mid) / 2.0
+    ry_u = (y3_mid - y3_top) / 2.0
+    upper_loop = pen.line(ellipse_arc_points(
+        x3_join, cy_u, bulge3, ry_u,
+        270.0, 90.0, clockwise=False, steps=220
+    ))
+    cy_l = (y3_mid + y3_bot) / 2.0
+    ry_l = (y3_bot - y3_mid) / 2.0
+    lower_loop = pen.line(ellipse_arc_points(
+        x3_join, cy_l, bulge3, ry_l,
+        270.0, 90.0, clockwise=False, steps=220
+    ))
 
-    c21 = (three_xR,               three_y0 + three_h * 0.58)
-    c22 = (three_xL,               three_y0 + three_h * 0.55)
+    glyphs["3"] = (pen.union(three_top, three_mid, three_bot, upper_loop, lower_loop), W)
 
-    c31 = (three_xL,               three_y0 + three_h * 0.92)
-    c32 = (three_xR - three_w * 0.35, three_y3)
+    # ------------------------------------------------------------------
+    # 4  (fix: remove left stem — it was reading like “N”)
+    # Diagonal + crossbar + right stem.
+    # ------------------------------------------------------------------
+    x4_stem = xR - 120.0
+    y4_cross = yMid + 20.0
 
-    three_pts = (
-        cubic_points(p0, c01, c02, p1, steps=70) +
-        cubic_points(p1, c11, c12, p2, steps=70)[1:] +
-        cubic_points(p2, c21, c22, p3, steps=70)[1:] +
-        cubic_points(p3, c31, c32, p4, steps=70)[1:]
-    )
-    three_curve = pen.line(three_pts)
-    three_midbar = pen.hline(cx - 10.0, three_xR + 10.0, yMid)  # tiny “readability” bar
-    glyphs["3"] = (pen.union(three_curve, three_midbar), W)
+    four_diag  = pen.line([(xL + 140.0, yTop + 90.0), (x4_stem, y4_cross)])
+    four_bar   = pen.hline(xL + 90.0, xR - 40.0, y4_cross)
+    four_stem  = pen.vline(x4_stem, yTop, yBase)
 
-    # ------------------------------------------------------------
-    # 4: give it a real “4” skeleton (not an arrow):
-    # left stem + diagonal into crossbar + right stem.
-    # ------------------------------------------------------------
-    four_left_x = xL + 120.0
-    four_stem_x = xR - 120.0
-    four_top_y  = yTop + 60.0
-    four_cross_y = yMid + 20.0
+    glyphs["4"] = (pen.union(four_diag, four_bar, four_stem), W)
 
-    four_left = pen.vline(four_left_x, four_top_y, four_cross_y)
-    four_diag = pen.line([(four_left_x, four_top_y), (four_stem_x, four_cross_y)])
-    four_bar  = pen.hline(xL + 60.0, xR - 40.0, four_cross_y)
-    four_stem = pen.vline(four_stem_x, yTop, yBase)
+    # ------------------------------------------------------------------
+    # 5  (fix: bottom must be a real bowl tied to midline, not a blob)
+    # Top + left + mid + right-half loop + baseline.
+    # ------------------------------------------------------------------
+    y5_top = yTop + 70.0
+    y5_mid = yMid + 10.0
+    y5_bot = yBase - 40.0
 
-    glyphs["4"] = (pen.union(four_left, four_diag, four_bar, four_stem), W)
+    x5_left = xL + 60.0
+    x5_join = xR - 220.0
+    bulge5  = 240.0
 
-    # ------------------------------------------------------------
-    # 5: make the bottom bowl start near the mid-bar (not “hanging”).
-    # top + left + mid + big bowl + baseline.
-    # ------------------------------------------------------------
-    five_top  = pen.hline(xL, xR, yTop)
-    five_left = pen.vline(xL, yTop, yMid)
-    five_mid  = pen.hline(xL, xR - 70.0, yMid)
+    five_top  = pen.hline(x5_left, xR - 40.0, y5_top)
+    five_left = pen.vline(x5_left, y5_top, y5_mid)
+    five_mid  = pen.hline(x5_left, x5_join, y5_mid)
+    five_bot  = pen.hline(x5_left, x5_join, y5_bot)
 
-    bowl_cx = cx + 35.0
-    bowl_cy = yMid + 90.0                 # anchor bowl to the midline
-    bowl_rx = rx * 0.95
-    bowl_ry = (yBase - yMid) * 0.50
+    cy5 = (y5_mid + y5_bot) / 2.0
+    ry5 = (y5_bot - y5_mid) / 2.0
+    five_loop = pen.line(ellipse_arc_points(
+        x5_join, cy5, bulge5, ry5,
+        270.0, 90.0, clockwise=False, steps=240
+    ))
 
-    bowl_pts = ellipse_arc_points(
-        bowl_cx, bowl_cy, bowl_rx, bowl_ry,
-        330.0, 210.0,
-        clockwise=True,  # go down and around (upper-right → bottom → lower-left)
-        steps=240
-    )
-    five_bowl = pen.line(bowl_pts)
+    glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    five_conn = pen.line([(xR - 70.0, yMid), bowl_pts[0]])      # mid-bar into bowl
-    five_base = pen.hline(xL, xR, yBase)
+    # ------------------------------------------------------------------
+    # 6  (fix: stop looking like “0 + hat” / “e”)
+    # Closed lower bowl + spiral tail that joins bowl upper-left.
+    # ------------------------------------------------------------------
+    six_cx = cx + 20.0
+    six_cy = yMid + 170.0
+    six_rx = rx * 0.86
+    six_ry = ry * 0.70
 
-    glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_conn, five_bowl, five_base), W)
+    six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
-    # ------------------------------------------------------------
-    # 6: avoid “0 with a hat”:
-    # - move loop DOWN
-    # - make loop an almost-closed ellipse arc with a small gap top-right
-    # - add a smooth entry stroke that actually joins the loop upper-left
-    # - add a small inner bar to force “6” read
-    # ------------------------------------------------------------
-    six_cx = cx + 10.0
-    six_cy = yMid + 110.0
-    six_rx = rx * 0.92
-    six_ry = ry * 0.78
+    # join on upper-left of bowl
+    join = ellipse_point(six_cx, six_cy, six_rx, six_ry, 210.0)
 
-    # almost full loop; small gap between ~20°..40° (top-right)
-    six_loop = pen.ellipse_arc(six_cx, six_cy, six_rx, six_ry, 40.0, 20.0, steps=420)
+    # tail starts upper-right, curls into the bowl (not a “hat”)
+    start = (xR - 110.0, yTop + 140.0)
+    c1 = (xR - 260.0, yTop + 40.0)
+    c2 = (six_cx - six_rx * 1.10, six_cy - six_ry * 0.55)
+    tail_pts = cubic_points(start, c1, c2, join, steps=100)
+    six_tail = pen.line(tail_pts)
 
-    join_pt = ellipse_point(six_cx, six_cy, six_rx, six_ry, 140.0)  # upper-left on loop
+    # small inward “bite” to force the 6 reading (short, low, not an e-bar)
+    six_hint = pen.line([
+        (six_cx + six_rx * 0.15, six_cy + six_ry * 0.10),
+        (six_cx + six_rx * 0.55, six_cy + six_ry * 0.10),
+    ])
 
-    entry_p0 = (xR - 90.0, yTop + 120.0)
-    entry_c1 = (xR - 230.0, yTop + 20.0)
-    entry_c2 = (six_cx - six_rx * 1.05, six_cy - six_ry * 0.80)
-    entry_pts = cubic_points(entry_p0, entry_c1, entry_c2, join_pt, steps=90)
-    six_entry = pen.line(entry_pts)
+    glyphs["6"] = (pen.union(six_bowl, six_tail, six_hint), W)
 
-    six_inner_y = six_cy + 10.0
-    six_inner = pen.hline(six_cx - six_rx * 0.20, six_cx + six_rx * 0.55, six_inner_y)
+    # 7
+    glyphs["7"] = (pen.union(
+        pen.hline(xL, xR, yTop),
+        pen.line([(xR, yTop), (xL + 40.0, yBase)]),
+    ), W)
 
-    glyphs["6"] = (pen.union(six_loop, six_entry, six_inner), W)
+    # 8
+    glyphs["8"] = (pen.union(
+        pen.ellipse_stroke(cx, (yTop + yMid) / 2.0, rx * 0.82, (yMid - yTop) / 2.0 * 0.82),
+        pen.ellipse_stroke(cx, (yMid + yBase) / 2.0, rx * 0.92, (yBase - yMid) / 2.0 * 0.92),
+    ), W)
 
-    # 7: top bar + diagonal
-    seven_top = pen.hline(xL, xR, yTop)
-    seven_diag = pen.line([(xR, yTop), (xL + 40.0, yBase)])
-    glyphs["7"] = (pen.union(seven_top, seven_diag), W)
-
-    # 8: two stacked loops
-    eight_top = pen.ellipse_stroke(cx, (yTop + yMid) / 2.0, rx * 0.82, (yMid - yTop) / 2.0 * 0.82)
-    eight_bot = pen.ellipse_stroke(cx, (yMid + yBase) / 2.0, rx * 0.92, (yBase - yMid) / 2.0 * 0.92)
-    glyphs["8"] = (pen.union(eight_top, eight_bot), W)
-
-    # 9: top loop + right stem
+    # 9
     nine_loop = pen.ellipse_stroke(cx, yMid - 70.0, rx * 0.90, ry * 0.60)
     nine_stem_x = cx + rx * 0.90
     nine_stem = pen.vline(nine_stem_x, yMid - 70.0, yBase)
@@ -598,6 +588,7 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         glyphs.setdefault(ch, (Polygon(), W))
 
     return glyphs
+
 
 
 def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
