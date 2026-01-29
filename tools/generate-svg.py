@@ -850,14 +850,29 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=q_rx, overlap=10.0,
     ), W)
 
+    # r (single smooth shoulder curve; starts lower)
     rx_stem = xL + 40.0
-    r_top = yXTop + 20.0
-    r_stem = pen.vline(rx_stem, r_top, yBase)
-    r_arm_y = r_top + 60.0
-    r_arm_x2 = rx_stem + 190.0
-    r_arm = pen.hline(rx_stem, r_arm_x2, r_arm_y)
-    r_drop = pen.vline(r_arm_x2, r_arm_y, r_arm_y + 70.0)
-    glyphs["r"] = (pen.union(r_stem, r_arm, r_drop), W)
+
+    # Start the shoulder noticeably below the x-height top (tune this)
+    r_shoulder_y = yXTop + 95.0
+
+    # Stem up to shoulder start
+    stem_pts = [(rx_stem, yBase), (rx_stem, r_shoulder_y)]
+
+    # One cubic curve from the shoulder start to the terminal
+    p0 = (rx_stem, r_shoulder_y)
+    p3 = (rx_stem + 260.0, r_shoulder_y + 105.0)   # right + droop
+
+    # Controls chosen so:
+    # - tangent at p0 is vertical (matches the stem)
+    # - curve flows right smoothly and ends heading down-right
+    c1 = (rx_stem,         r_shoulder_y - 70.0)     # keep start tangent vertical
+    c2 = (rx_stem + 215.0, r_shoulder_y + 15.0)     # keeps end smooth (no hard bend)
+
+    shoulder_pts = cubic_points(p0, c1, c2, p3, steps=90)
+
+    glyphs["r"] = (pen.line(stem_pts + shoulder_pts[1:]), W)
+
 
     s_y0 = yXTop + 35.0
     s_y3 = yBase - 25.0
