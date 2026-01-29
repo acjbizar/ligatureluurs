@@ -673,25 +673,33 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     n_shape = pen.line([(n_x1, yBase), (n_x1, n_top), (n_x2, n_top), (n_x2, yBase)])
     glyphs["n"] = (n_shape, W)
 
+    # o
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
+    # p/q: make descender length match ascender length (like b/d), optically consistent
+    desc_len = (yXTop - yAsc)          # same distance b/d rise above x-height
+    pq_stem_bot = yBase + desc_len     # extend below baseline by that amount
+    #pq_stem_bot = min(pq_stem_bot, yDesc - 10.0)  # safety clamp
+
+    # p
     p_stem_x = xL + 40.0
     p_top = yXTop + 15.0
     p_bot = yBase - 10.0
     p_rx = (xR - p_stem_x) * 0.52
     glyphs["p"] = (dshape_stem_bowl(
         stem_x=p_stem_x, top_y=p_top, bot_y=p_bot,
-        side="right", stem_top=p_top, stem_bot=m.DESC_END - 10.0,
+        side="right", stem_top=p_top, stem_bot=pq_stem_bot,
         bowl_rx=p_rx, overlap=10.0,
     ), W)
 
+    # q
     q_stem_x = xR - 40.0
     q_top = yXTop + 15.0
     q_bot = yBase - 10.0
     q_rx = (q_stem_x - xL) * 0.52
     glyphs["q"] = (dshape_stem_bowl(
         stem_x=q_stem_x, top_y=q_top, bot_y=q_bot,
-        side="left", stem_top=q_top, stem_bot=m.DESC_END - 10.0,
+        side="left", stem_top=q_top, stem_bot=pq_stem_bot,
         bowl_rx=q_rx, overlap=10.0,
     ), W)
 
