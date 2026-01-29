@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ligatureluurs — Interactive Sample</title>
+
+    <style>
+        /* Load the built font(s). This page lives in sketches/, so fonts are in ../dist/fonts/ */
+        @font-face {
+            font-family: "Ligatureluurs";
+            src:
+                    url("../dist/fonts/ligatureluurs.woff2") format("woff2"),
+                    url("../dist/fonts/ligatureluurs.woff") format("woff"),
+                    url("../dist/fonts/ligatureluurs.ttf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        :root {
+            --bg: #fafafa;
+            --fg: #111111;
+            --panel: #ffffff;
+            --border: #dedede;
+            --muted: rgba(0,0,0,.55);
+
+            --size: 96px;
+            --line: 1.05;
+            --track: 0em;
+            --pad: 24px;
+
+            /* Optional overlay guides (approximate in CSS em-space) */
+            --show-guides: 1;        /* 0 / 1 */
+            --baseline-em: 0.78em;   /* tweakable */
+            --cap-em: 0.06em;        /* tweakable */
+            --xh-em: 0.34em;         /* tweakable */
+
+            /* OpenType feature toggles */
+            --liga: 1;               /* 0 / 1 */
+            --kern: 1;               /* 0 / 1 */
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(to bottom, rgba(255,255,255,.75), rgba(255,255,255,.55));
+            backdrop-filter: blur(6px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        header .title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 750;
+            letter-spacing: .2px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .wrap {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 16px;
+            padding: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 980px) {
+            .wrap { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 6px 22px rgba(0,0,0,.05);
+        }
+
+        .card .hd {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card .bd {
+            padding: 14px 16px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 160px;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+        .row > label {
+            font-size: 12px;
+            color: rgba(0,0,0,.75);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .row > label small {
+            color: var(--muted);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] { width: 100%; }
+        input[type="color"] {
+            width: 44px;
+            height: 30px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: transparent;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 140px;
+            resize: vertical;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.35;
+            background: #fcfcfc;
+        }
+
+        .btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        button {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-weight: 650;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(0.98); }
+        button:active { transform: translateY(1px); }
+
+        .toggles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .toggle {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #fff;
+        }
+        .toggle span {
+            font-size: 12px;
+            font-weight: 650;
+            color: rgba(0,0,0,.8);
+        }
+
+        .previewWrap {
+            padding: 0;
+        }
+
+        .previewToolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            background: #fff;
+        }
+        .previewToolbar .hint {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .previewToolbar code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11px;
+            background: #f3f3f3;
+            padding: 2px 6px;
+            border-radius: 8px;
+            border: 1px solid #e5e5e5;
+        }
+
+        .preview {
+            padding: var(--pad);
+            background: var(--bg);
+            min-height: 620px;
+        }
+
+        .sample {
+            font-family: "Ligatureluurs", sans-serif;
+            font-size: var(--size);
+            line-height: var(--line);
+            letter-spacing: var(--track);
+            color: var(--fg);
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-feature-settings:
+                    "liga" var(--liga),
+                    "kern" var(--kern);
+            position: relative;
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px dashed rgba(0,0,0,.18);
+            background: rgba(255,255,255,.55);
+        }
+
+        /* Approximate baseline/cap/x-height guides (toggleable).
+           These are visual helpers and not guaranteed to match real font metrics in CSS layout. */
+        .sample.guides::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: 14px;
+
+            /* multiple repeating gradients to draw thin lines */
+            background:
+                /* baseline */
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--baseline-em) - 0.75px),
+                            rgba(255,0,0,.25) calc(var(--baseline-em) - 0.75px),
+                            rgba(255,0,0,.25) calc(var(--baseline-em) + 0.75px),
+                            transparent calc(var(--baseline-em) + 0.75px)
+                    ),
+                        /* cap line */
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--cap-em) - 0.75px),
+                            rgba(0,128,255,.22) calc(var(--cap-em) - 0.75px),
+                            rgba(0,128,255,.22) calc(var(--cap-em) + 0.75px),
+                            transparent calc(var(--cap-em) + 0.75px)
+                    ),
+                        /* x-height line */
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--xh-em) - 0.75px),
+                            rgba(0,180,120,.20) calc(var(--xh-em) - 0.75px),
+                            rgba(0,180,120,.20) calc(var(--xh-em) + 0.75px),
+                            transparent calc(var(--xh-em) + 0.75px)
+                    );
+            opacity: var(--show-guides);
+        }
+
+        .glyphGrid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+            gap: 10px;
+        }
+        .gcell {
+            background: rgba(255,255,255,.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+        .gcell .ch {
+            font-family: "Ligatureluurs", sans-serif;
+            font-size: 44px;
+            line-height: 1.05;
+            letter-spacing: var(--track);
+            font-feature-settings: "liga" var(--liga), "kern" var(--kern);
+        }
+        .gcell .lab {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--muted);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <div class="title">
+        <div>
+            <h1>Ligatureluurs — interactive font sample</h1>
+            <div class="subtitle">Loading: <code>../dist/fonts/ligatureluurs.woff2</code> (fallback to WOFF/TTF)</div>
+        </div>
+        <div class="subtitle" id="status">Font loading…</div>
+    </div>
+</header>
+
+<div class="wrap">
+    <!-- Controls -->
+    <section class="card">
+        <div class="hd">
+            <span>Controls</span>
+            <button id="resetBtn" type="button">Reset</button>
+        </div>
+        <div class="bd">
+
+            <div class="row">
+                <label>Font size <small id="vSize"></small></label>
+                <input id="size" type="range" min="16" max="240" step="1" />
+            </div>
+
+            <div class="row">
+                <label>Line height <small id="vLine"></small></label>
+                <input id="line" type="range" min="0.80" max="2.20" step="0.01" />
+            </div>
+
+            <div class="row">
+                <label>Tracking (em) <small id="vTrack"></small></label>
+                <input id="track" type="range" min="-0.10" max="0.30" step="0.005" />
+            </div>
+
+            <div class="row">
+                <label>Padding <small id="vPad"></small></label>
+                <input id="pad" type="range" min="0" max="80" step="1" />
+            </div>
+
+            <div class="row">
+                <label>Text color <small id="vFg"></small></label>
+                <input id="fg" type="color" />
+            </div>
+
+            <div class="row">
+                <label>Background <small id="vBg"></small></label>
+                <input id="bg" type="color" />
+            </div>
+
+            <div class="toggles">
+                <label class="toggle">
+                    <span>Ligatures (liga)</span>
+                    <input id="liga" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Kerning (kern)</span>
+                    <input id="kern" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Guides overlay</span>
+                    <input id="guides" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Glyph grid</span>
+                    <input id="grid" type="checkbox" checked />
+                </label>
+            </div>
+
+            <div style="height:12px"></div>
+
+            <div class="row">
+                <label>Baseline (em) <small id="vBase"></small></label>
+                <input id="baseline" type="range" min="0.20" max="1.20" step="0.01" />
+            </div>
+
+            <div class="row">
+                <label>Cap line (em) <small id="vCap"></small></label>
+                <input id="cap" type="range" min="0.00" max="0.30" step="0.005" />
+            </div>
+
+            <div class="row">
+                <label>X-height line (em) <small id="vXh"></small></label>
+                <input id="xh" type="range" min="0.15" max="0.70" step="0.01" />
+            </div>
+
+            <div style="height:10px"></div>
+
+            <label style="font-size:12px;font-weight:700;color:rgba(0,0,0,.8)">Sample text</label>
+            <div style="height:8px"></div>
+            <textarea id="text"></textarea>
+
+            <div class="btns">
+                <button type="button" data-preset="hamburgefontsiv">Hamburgefontsiv</button>
+                <button type="button" data-preset="pairs">Pairs</button>
+                <button type="button" data-preset="digits">Digits</button>
+                <button type="button" data-preset="pangram">Pangram</button>
+            </div>
+
+            <div class="subtitle" style="margin-top:10px">
+                Tip: if you open this as <code>file://</code> and the font doesn’t load, use a local server.
+            </div>
+        </div>
+    </section>
+
+    <!-- Preview -->
+    <section class="card previewWrap">
+        <div class="previewToolbar">
+            <div class="hint">
+                Preview <span style="opacity:.45">•</span> <code id="liveCss"></code>
+            </div>
+            <button id="copyCssBtn" type="button">Copy CSS</button>
+        </div>
+
+        <div class="preview">
+            <div id="sample" class="sample guides"></div>
+
+            <div id="gridWrap" style="margin-top:16px">
+                <div class="subtitle" style="margin:10px 0 10px 2px">Glyph quick look (digits + uppercase + lowercase)</div>
+                <div id="glyphGrid" class="glyphGrid"></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    (() => {
+        const root = document.documentElement;
+        const statusEl = document.getElementById("status");
+
+        const el = {
+            size: document.getElementById("size"),
+            line: document.getElementById("line"),
+            track: document.getElementById("track"),
+            pad: document.getElementById("pad"),
+            fg: document.getElementById("fg"),
+            bg: document.getElementById("bg"),
+            liga: document.getElementById("liga"),
+            kern: document.getElementById("kern"),
+            guides: document.getElementById("guides"),
+            grid: document.getElementById("grid"),
+            baseline: document.getElementById("baseline"),
+            cap: document.getElementById("cap"),
+            xh: document.getElementById("xh"),
+            text: document.getElementById("text"),
+            sample: document.getElementById("sample"),
+            glyphGrid: document.getElementById("glyphGrid"),
+            gridWrap: document.getElementById("gridWrap"),
+            liveCss: document.getElementById("liveCss"),
+            copyCssBtn: document.getElementById("copyCssBtn"),
+            resetBtn: document.getElementById("resetBtn"),
+        };
+
+        const val = {
+            vSize: document.getElementById("vSize"),
+            vLine: document.getElementById("vLine"),
+            vTrack: document.getElementById("vTrack"),
+            vPad: document.getElementById("vPad"),
+            vFg: document.getElementById("vFg"),
+            vBg: document.getElementById("vBg"),
+            vBase: document.getElementById("vBase"),
+            vCap: document.getElementById("vCap"),
+            vXh: document.getElementById("vXh"),
+        };
+
+        const presets = {
+            hamburgefontsiv: "HAMBURGEFONTSIV\nhamburgefontsiv\n0123456789\n\nAa Bb Cc Dd Ee Ff Gg Hh Ii Jj\nKk Ll Mm Nn Oo Pp Qq Rr Ss Tt\nUu Vv Ww Xx Yy Zz",
+            pairs: "Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll\nMm Nn Oo Pp Qq Rr Ss Tt Uu Vv\nWw Xx Yy Zz\n\nst ct sh th ff fi fl",
+            digits: "0123456789\n10 11 12 13 14 15 16 17 18 19\n20 21 22 23 24 25 26 27 28 29\n\n2026  123456  98  0  7  42",
+            pangram: "SPHINX OF BLACK QUARTZ JUDGE MY VOW\nTHE QUICK BROWN FOX JUMPS OVER THE LAZY DOG\n\nsphinx of black quartz judge my vow\nthe quick brown fox jumps over the lazy dog\n\n0123456789",
+        };
+
+        const defaults = {
+            size: 96,
+            line: 1.05,
+            track: 0,
+            pad: 24,
+            fg: "#111111",
+            bg: "#fafafa",
+            liga: true,
+            kern: true,
+            guides: true,
+            grid: true,
+            baseline: 0.78,
+            cap: 0.06,
+            xh: 0.34,
+            text: presets.hamburgefontsiv,
+        };
+
+        const LS_KEY = "ligatureluurs.sample.settings.v1";
+
+        function loadSettings() {
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (!raw) return { ...defaults };
+                const obj = JSON.parse(raw);
+                return { ...defaults, ...obj };
+            } catch {
+                return { ...defaults };
+            }
+        }
+
+        function saveSettings(s) {
+            try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+        }
+
+        function setVar(name, value) {
+            root.style.setProperty(name, value);
+        }
+
+        function clamp(n, a, b) { return Math.min(b, Math.max(a, n)); }
+
+        function updateLabels(s) {
+            val.vSize.textContent = s.size + "px";
+            val.vLine.textContent = s.line.toFixed(2);
+            val.vTrack.textContent = s.track.toFixed(3) + "em";
+            val.vPad.textContent = s.pad + "px";
+            val.vFg.textContent = s.fg;
+            val.vBg.textContent = s.bg;
+            val.vBase.textContent = s.baseline.toFixed(2) + "em";
+            val.vCap.textContent = s.cap.toFixed(3) + "em";
+            val.vXh.textContent = s.xh.toFixed(2) + "em";
+
+            el.liveCss.textContent =
+                `font-size:${s.size}px; line-height:${s.line.toFixed(2)}; letter-spacing:${s.track.toFixed(3)}em; ` +
+                `font-feature-settings:"liga" ${s.liga?1:0},"kern" ${s.kern?1:0};`;
+        }
+
+        function apply(s) {
+            // CSS vars
+            setVar("--size", s.size + "px");
+            setVar("--line", String(s.line));
+            setVar("--track", s.track + "em");
+            setVar("--pad", s.pad + "px");
+            setVar("--fg", s.fg);
+            setVar("--bg", s.bg);
+
+            setVar("--liga", s.liga ? 1 : 0);
+            setVar("--kern", s.kern ? 1 : 0);
+
+            setVar("--show-guides", s.guides ? 1 : 0);
+            setVar("--baseline-em", s.baseline + "em");
+            setVar("--cap-em", s.cap + "em");
+            setVar("--xh-em", s.xh + "em");
+
+            // UI controls
+            el.size.value = s.size;
+            el.line.value = s.line;
+            el.track.value = s.track;
+            el.pad.value = s.pad;
+            el.fg.value = s.fg;
+            el.bg.value = s.bg;
+            el.liga.checked = !!s.liga;
+            el.kern.checked = !!s.kern;
+            el.guides.checked = !!s.guides;
+            el.grid.checked = !!s.grid;
+            el.baseline.value = s.baseline;
+            el.cap.value = s.cap;
+            el.xh.value = s.xh;
+            el.text.value = s.text;
+
+            // sample content
+            el.sample.textContent = s.text;
+            el.sample.classList.toggle("guides", !!s.guides);
+
+            el.gridWrap.style.display = s.grid ? "" : "none";
+
+            updateLabels(s);
+            saveSettings(s);
+        }
+
+        function buildGlyphGrid() {
+            const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            el.glyphGrid.innerHTML = "";
+            for (const ch of chars) {
+                const cell = document.createElement("div");
+                cell.className = "gcell";
+
+                const c = document.createElement("div");
+                c.className = "ch";
+                c.textContent = ch;
+
+                const lab = document.createElement("div");
+                lab.className = "lab";
+                lab.textContent = ch;
+
+                cell.appendChild(c);
+                cell.appendChild(lab);
+                el.glyphGrid.appendChild(cell);
+            }
+        }
+
+        function bind(s) {
+            const read = () => ({
+                size: clamp(parseInt(el.size.value, 10) || defaults.size, 1, 999),
+                line: clamp(parseFloat(el.line.value) || defaults.line, 0.5, 3.0),
+                track: clamp(parseFloat(el.track.value) || 0, -1, 2),
+                pad: clamp(parseInt(el.pad.value, 10) || 0, 0, 200),
+                fg: el.fg.value || defaults.fg,
+                bg: el.bg.value || defaults.bg,
+                liga: el.liga.checked,
+                kern: el.kern.checked,
+                guides: el.guides.checked,
+                grid: el.grid.checked,
+                baseline: clamp(parseFloat(el.baseline.value) || defaults.baseline, 0, 2),
+                cap: clamp(parseFloat(el.cap.value) || defaults.cap, 0, 2),
+                xh: clamp(parseFloat(el.xh.value) || defaults.xh, 0, 2),
+                text: el.text.value ?? defaults.text,
+            });
+
+            const onAny = () => apply(read());
+
+            ["input", "change"].forEach(evt => {
+                el.size.addEventListener(evt, onAny);
+                el.line.addEventListener(evt, onAny);
+                el.track.addEventListener(evt, onAny);
+                el.pad.addEventListener(evt, onAny);
+                el.fg.addEventListener(evt, onAny);
+                el.bg.addEventListener(evt, onAny);
+                el.liga.addEventListener(evt, onAny);
+                el.kern.addEventListener(evt, onAny);
+                el.guides.addEventListener(evt, onAny);
+                el.grid.addEventListener(evt, onAny);
+                el.baseline.addEventListener(evt, onAny);
+                el.cap.addEventListener(evt, onAny);
+                el.xh.addEventListener(evt, onAny);
+                el.text.addEventListener(evt, onAny);
+            });
+
+            document.querySelectorAll("button[data-preset]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const key = btn.getAttribute("data-preset");
+                    if (!key || !presets[key]) return;
+                    const next = read();
+                    next.text = presets[key];
+                    apply(next);
+                });
+            });
+
+            el.resetBtn.addEventListener("click", () => apply({ ...defaults }));
+
+            el.copyCssBtn.addEventListener("click", async () => {
+                const cur = read();
+                const css = [
+                    `font-family: "Ligatureluurs", sans-serif;`,
+                    `font-size: ${cur.size}px;`,
+                    `line-height: ${cur.line.toFixed(2)};`,
+                    `letter-spacing: ${cur.track.toFixed(3)}em;`,
+                    `font-feature-settings: "liga" ${cur.liga ? 1 : 0}, "kern" ${cur.kern ? 1 : 0};`,
+                    `color: ${cur.fg};`,
+                ].join("\n");
+                try {
+                    await navigator.clipboard.writeText(css);
+                    el.copyCssBtn.textContent = "Copied!";
+                    setTimeout(() => (el.copyCssBtn.textContent = "Copy CSS"), 1000);
+                } catch {
+                    alert("Could not copy to clipboard (browser permissions).");
+                }
+            });
+        }
+
+        async function fontStatus() {
+            // Helps show if font loads, without being overly strict about file://
+            try {
+                // Try to trigger load
+                await document.fonts.load('16px "Ligatureluurs"');
+                const ok = document.fonts.check('16px "Ligatureluurs"');
+                statusEl.textContent = ok ? "Font loaded ✔" : "Font not loaded (check paths / use a local server)";
+            } catch {
+                statusEl.textContent = "Font status unknown (use a local server if needed)";
+            }
+        }
+
+        // init
+        buildGlyphGrid();
+        const s = loadSettings();
+        bind(s);
+        apply(s);
+        fontStatus();
+    })();
+</script>
+
+</body>
+</html>
