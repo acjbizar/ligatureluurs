@@ -539,34 +539,48 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    # 6 (proper: closed bowl + tangential tail joining upper-left; no inner bar)
-    six_cx = cx + 12.0
-    six_cy = yMid + 175.0
-    six_rx = rx * 0.84
-    six_ry = ry * 0.74
+    # 6 (single smooth upper arc that joins bowl at left-middle; no “long way around”)
+    six_cx = cx + 15.0
+    six_cy = yMid + 120.0
+    six_rx = rx * 0.82
+    six_ry = ry * 0.62
 
-    six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
+    # Join point = left-middle of bowl
+    join_x = six_cx - six_rx
+    join_y = six_cy
 
-    # join the tail on the upper-left of the bowl
-    join_deg = 230.0
-    join = ellipse_point(six_cx, six_cy, six_rx, six_ry, join_deg)
+    # Terminal arc ellipse:
+    # Keep join as the LEFTMOST point (angle 180°) so tangents match cleanly.
+    term_rx = six_rx * 1.45
+    term_ry = six_ry * 1.95
+    term_cx = join_x + term_rx
+    term_cy = join_y
 
-    # tangent direction on ellipse at join (for a smooth merge)
-    t = math.radians(join_deg)
-    tvx = -six_rx * math.sin(t)
-    tvy =  six_ry * math.cos(t)
-    ux, uy = norm(tvx, tvy)
+    # IMPORTANT: Use upper-half angles and go CLOCKWISE so we don't sweep under the bowl.
+    term_start_deg = 290.0   # upper-right-ish
+    term_end_deg   = 180.0   # leftmost (the join)
 
-    # tail starts top-right-ish, curls into the bowl
-    p0 = (xR - 150.0, yTop + 105.0)
-    p1 = (xR - 340.0, yTop + 10.0)
-    p2 = (join[0] - ux * 190.0, join[1] - uy * 190.0)  # approach join tangentially
-    p3 = join
+    term_pts = ellipse_arc_points(
+        term_cx, term_cy, term_rx, term_ry,
+        term_start_deg, term_end_deg,
+        clockwise=True,
+        steps=260
+    )
+    # Force exact join (avoids tiny float drift)
+    term_pts[-1] = (join_x, join_y)
 
-    tail_pts = cubic_points(p0, p1, p2, p3, steps=120)
-    six_tail = pen.line(tail_pts)
+    # Full bowl loop starting/ending at the same join point
+    bowl_pts = ellipse_arc_points(
+        six_cx, six_cy, six_rx, six_ry,
+        180.0, 180.0,
+        clockwise=False,
+        steps=520
+    )
+    bowl_pts[0] = (join_x, join_y)
 
-    glyphs["6"] = (pen.union(six_bowl, six_tail), W)
+    six_pts = term_pts + bowl_pts[1:]
+    glyphs["6"] = (pen.line(six_pts), W)
+
 
     # 7
     glyphs["7"] = (pen.union(
