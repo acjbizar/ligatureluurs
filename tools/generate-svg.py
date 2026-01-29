@@ -434,6 +434,106 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     return glyphs
 
 
+def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
+    """
+    Lining digits built on the same cap metrics as uppercase:
+    - width = CAP_W
+    - top = CAP_TOP, baseline = BASE
+    - monoline construction via pen.line/arc/ellipse_*
+    """
+    W = m.CAP_W
+    xL, xR = 130.0, W - 130.0
+    cx = W / 2.0
+    yTop, yBase, yMid = m.CAP_TOP, m.BASE, m.CAP_MID
+
+    rx = (xR - xL) / 2.0
+    ry = (yBase - yTop) / 2.0
+
+    glyphs: Dict[str, Tuple[Geom, float]] = {}
+
+    # 0: like O
+    glyphs["0"] = (pen.ellipse_stroke(cx, yMid, rx, ry), W)
+
+    # 1: stem + base + small top flick
+    one_x = cx + 30.0
+    one_stem = pen.vline(one_x, yTop + 20.0, yBase)
+    one_base = pen.hline(one_x - 110.0, one_x + 90.0, yBase)
+    one_flick = pen.line([(one_x - 60.0, yTop + 90.0), (one_x, yTop + 20.0)])
+    glyphs["1"] = (pen.union(one_stem, one_base, one_flick), W)
+
+    # 2: top arc + diagonal + base
+    yArc = yTop + 200.0
+    rArc = (xR - xL) / 2.0
+    two_top = pen.arc(cx, yArc, rArc, 180.0, 360.0, steps=180)
+    two_diag = pen.line([(xR, yArc), (xL, yBase)])
+    two_base = pen.hline(xL, xR, yBase)
+    glyphs["2"] = (pen.union(two_top, two_diag, two_base), W)
+
+    # 3: two right arcs + mid join
+    top_cy = (yTop + yMid) / 2.0
+    bot_cy = (yMid + yBase) / 2.0
+    ryh = (yMid - yTop) / 2.0
+    rx3 = rx * 0.98
+
+    three_top = pen.ellipse_arc(cx, top_cy, rx3, ryh, 300.0, 60.0, steps=200)
+    three_bot = pen.ellipse_arc(cx, bot_cy, rx3, ryh, 300.0, 60.0, steps=200)
+
+    # small join on the right + mid bar to keep it reading as a "3"
+    p_top_dn = ellipse_point(cx, top_cy, rx3, ryh, 300.0)  # down-right on top bowl
+    p_bot_up = ellipse_point(cx, bot_cy, rx3, ryh, 60.0)   # up-right on bottom bowl
+    three_join = pen.line([p_top_dn, p_bot_up])
+    three_mid = pen.hline(cx - 20.0, xR, yMid)
+
+    glyphs["3"] = (pen.union(three_top, three_bot, three_join, three_mid), W)
+
+    # 4: diagonal + right stem + crossbar
+    four_x = xR - 110.0
+    four_y = yMid + 20.0
+    four_diag = pen.line([(xL + 40.0, yTop + 80.0), (four_x, four_y)])
+    four_stem = pen.vline(four_x, yTop, yBase)
+    four_bar  = pen.hline(xL + 40.0, xR, four_y)
+    glyphs["4"] = (pen.union(four_diag, four_stem, four_bar), W)
+
+    # 5: top + left down + mid + bottom bowl-ish curve
+    five_top = pen.hline(xL, xR, yTop)
+    five_left = pen.vline(xL, yTop, yMid)
+    five_mid = pen.hline(xL, xR - 40.0, yMid)
+
+    bot_cy5 = (yMid + yBase) / 2.0
+    ry5 = (yBase - yMid) / 2.0
+    five_curve = pen.ellipse_arc(cx, bot_cy5, rx * 0.98, ry5 * 0.98, 200.0, 20.0, steps=240)
+    five_base = pen.hline(xL, xR, yBase)
+
+    glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_curve, five_base), W)
+
+    # 6: lower loop + top hook
+    six_loop_cy = yMid + 90.0
+    six_loop = pen.ellipse_stroke(cx, six_loop_cy, rx * 0.92, ry * 0.72)
+    six_hook = pen.ellipse_arc(cx, yMid - 70.0, rx * 0.78, ry * 0.60, 210.0, 20.0, steps=240)
+    glyphs["6"] = (pen.union(six_loop, six_hook), W)
+
+    # 7: top bar + diagonal
+    seven_top = pen.hline(xL, xR, yTop)
+    seven_diag = pen.line([(xR, yTop), (xL + 40.0, yBase)])
+    glyphs["7"] = (pen.union(seven_top, seven_diag), W)
+
+    # 8: two stacked loops
+    eight_top = pen.ellipse_stroke(cx, (yTop + yMid) / 2.0, rx * 0.82, (yMid - yTop) / 2.0 * 0.82)
+    eight_bot = pen.ellipse_stroke(cx, (yMid + yBase) / 2.0, rx * 0.92, (yBase - yMid) / 2.0 * 0.92)
+    glyphs["8"] = (pen.union(eight_top, eight_bot), W)
+
+    # 9: top loop + right stem
+    nine_loop = pen.ellipse_stroke(cx, yMid - 70.0, rx * 0.90, ry * 0.60)
+    nine_stem_x = cx + rx * 0.90
+    nine_stem = pen.vline(nine_stem_x, yMid - 70.0, yBase)
+    glyphs["9"] = (pen.union(nine_loop, nine_stem), W)
+
+    for ch in "0123456789":
+        glyphs.setdefault(ch, (Polygon(), W))
+
+    return glyphs
+
+
 def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     W = m.LC_W
     xL, xR = 110.0, W - 110.0
@@ -485,10 +585,8 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["c"] = (pen.ellipse_arc(bcX, bcY, rx, ry, 45.0, 315.0, steps=240), W)
 
     # a: one continuous stroke (terminal + stem + bowl + bar)
-    # Matches the latest SVG path we settled on.
     a_p0  = (146.0, 400.0)
 
-    # terminal into stem
     a_c01 = (205.0, 320.0)
     a_c02 = (265.0, 310.0)
     a_p1  = (312.0, 315.0)
@@ -500,11 +598,9 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     seg0 = cubic_points(a_p0, a_c01, a_c02, a_p1, steps=50)
     seg1 = cubic_points(a_p1, a_c11, a_c12, a_p2, steps=30)
 
-    # straight down stem, then bottom bar to the left
     stem_down = [(360.0, 770.0)]
     bottom_in = [(256.0, 770.0)]
 
-    # left bowl back up to the bar (two cubic segments)
     a_p3  = (146.0, 665.0)
     a_c21 = (195.25, 770.0)
     a_c22 = (146.0, 723.0)
@@ -516,7 +612,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     seg2 = cubic_points(bottom_in[-1], a_c21, a_c22, a_p3, steps=35)
     seg3 = cubic_points(a_p3, a_c31, a_c32, a_p4, steps=35)
 
-    # bar back to the stem
     bar_out = [(360.0, 560.0)]
 
     a_pts = (
@@ -530,7 +625,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
 
     glyphs["a"] = (pen.line(a_pts), W)
-
 
     b_stem_x = xL + 40.0
     b_top = yXTop + 15.0
@@ -553,19 +647,13 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     ), W)
 
     # e (single continuous stroke: bar -> long ellipse arc)
-    # Matches the approved SVG: M bar_start -> bar_end then a large arc around to lower-right.
     e_cx, e_cy = bcX, bcY
     e_rx, e_ry = rx, ry
-
-    # Place the bar a bit above the ellipse center (works nicely with your metrics)
     e_bar_y = yXTop + 180.0
 
-    # Compute the corresponding ellipse angle on the RIGHT side for that y (so bar end lies on the ellipse)
     s = (e_bar_y - e_cy) / e_ry
     s = max(-1.0, min(1.0, s))
-    a_start = math.degrees(math.asin(s)) % 360.0  # near 340–360 degrees typically
-
-    # End angle down on the right side (gives the “open below” feel)
+    a_start = math.degrees(math.asin(s)) % 360.0
     a_end = 70.0
 
     bar_end = ellipse_point(e_cx, e_cy, e_rx, e_ry, a_start)
@@ -574,22 +662,19 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     arc_pts = ellipse_arc_points(
         e_cx, e_cy, e_rx, e_ry,
         a_start, a_end,
-        clockwise=True,   # take the long way around (large arc)
+        clockwise=True,
         steps=220
     )
 
     e_pts = [bar_start, bar_end] + arc_pts[1:]
     glyphs["e"] = (pen.line(e_pts), W)
 
-    # f: smooth rounded top hook + short rightward crossbar (closer to reference)
+    # f
     fx = cx - 65.0
     f_top = yAsc + 10.0
     f_bot = yBase - 10.0
-
-    # main stem
     f_stem = pen.vline(fx, f_top, f_bot)
 
-    # top hook: an elliptical arc starting on the stem (leftmost point) and curving to the right/down
     hook_cx = fx + 110.0
     hook_cy = f_top + 35.0
     hook_rx = 110.0
@@ -602,14 +687,12 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     f_hook = pen.line(hook_pts)
 
-    # short crossbar, mostly to the right (no left extension)
     f_cross_y = yXTop + 110.0
     f_cross = pen.hline(fx, fx + 235.0, f_cross_y)
 
     glyphs["f"] = (pen.union(f_stem, f_hook, f_cross), W)
 
-
-    # g: no bar + stem moved right
+    # g
     g_cx, g_cy = bcX - 20.0, bcY - 10.0
     g_rx, g_ry = rx * 0.88, ry * 0.88
     g_bowl = pen.ellipse_stroke(g_cx, g_cy, g_rx, g_ry)
@@ -620,7 +703,7 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     g_hook = pen.arc(g_stem_x - 120.0, g_stem_y1, 120.0, 0.0, 180.0, steps=180)
     glyphs["g"] = (pen.union(g_bowl, g_stem, g_hook), W)
 
-    # h: rounded shoulder bend (polyline)
+    # h
     hxL = xL + 40.0
     hxR = xR - 40.0
     h_top_y = yXTop + 20.0
@@ -642,10 +725,8 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
-    # --- helper: aperture width used by "n" (so we can match it) ---
-    n_aperture = (xR - 40.0) - (xL + 40.0)  # n_x2 - n_x1
+    n_aperture = (xR - 40.0) - (xL + 40.0)
 
-    # m: wider (adds one extra n-aperture), apertures match "n"
     Wm = W + n_aperture
     xLm, xRm = 110.0, Wm - 110.0
 
@@ -654,7 +735,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     m_x3 = m_x2 + n_aperture
     m_top = yXTop + 20.0
 
-    # single continuous stroke (up, over, down, up, over, down)
     m_pts = [
         (m_x1, yBase),
         (m_x1, m_top),
@@ -666,22 +746,17 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     ]
     glyphs["m"] = (pen.line(m_pts), Wm)
 
-    # n: rounded shoulder
     n_x1 = xL + 40.0
     n_x2 = xR - 40.0
     n_top = yXTop + 20.0
     n_shape = pen.line([(n_x1, yBase), (n_x1, n_top), (n_x2, n_top), (n_x2, yBase)])
     glyphs["n"] = (n_shape, W)
 
-    # o
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
-    # p/q: make descender length match ascender length (like b/d), optically consistent
-    desc_len = (yXTop - yAsc)          # same distance b/d rise above x-height
-    pq_stem_bot = yBase + desc_len     # extend below baseline by that amount
-    #pq_stem_bot = min(pq_stem_bot, yDesc - 10.0)  # safety clamp
+    desc_len = (yXTop - yAsc)
+    pq_stem_bot = yBase + desc_len
 
-    # p
     p_stem_x = xL + 40.0
     p_top = yXTop + 15.0
     p_bot = yBase - 10.0
@@ -692,7 +767,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=p_rx, overlap=10.0,
     ), W)
 
-    # q
     q_stem_x = xR - 40.0
     q_top = yXTop + 15.0
     q_bot = yBase - 10.0
@@ -703,7 +777,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=q_rx, overlap=10.0,
     ), W)
 
-    # r: closer to your source
     rx_stem = xL + 40.0
     r_top = yXTop + 20.0
     r_stem = pen.vline(rx_stem, r_top, yBase)
@@ -713,7 +786,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     r_drop = pen.vline(r_arm_x2, r_arm_y, r_arm_y + 70.0)
     glyphs["r"] = (pen.union(r_stem, r_arm, r_drop), W)
 
-    # s: less dynamic + not tiny
     s_y0 = yXTop + 35.0
     s_y3 = yBase - 25.0
     s_h = s_y3 - s_y0
@@ -740,17 +812,11 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["s"] = (pen.line(s_pts), W)
 
-    # t: high crossbar, mostly to the RIGHT (matches reference)
     tx = cx + 85.0
-
     t_top = yAsc + 10.0
     t_bot = yBase - 10.0
-
-    # crossbar sits relatively high
     t_cross_y = yXTop + 60.0
-
-    # bar starts at the stem and goes right (optionally tiny left overhang)
-    t_left  = tx            # use tx - 15.0 if you want a hair to the left
+    t_left  = tx
     t_right = tx + 220.0
 
     glyphs["t"] = (pen.union(
@@ -758,8 +824,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(t_left, t_right, t_cross_y),
     ), W)
 
-
-    # u: no bottom arc; aligned baseline
     ux1 = xL + 50.0
     ux2 = xR - 50.0
     u_top = yXTop + 20.0
@@ -768,7 +832,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["v"] = (pen.line([(xL + 60.0, yXTop + 20.0), (cx, yBase), (xR - 60.0, yXTop + 20.0)]), W)
 
-    # w: wider (adds one extra n-aperture), apertures match "n"
     Ww = W + n_aperture
     xLw, xRw = 110.0, Ww - 110.0
 
@@ -778,7 +841,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     w_top = yXTop + 20.0
     w_bot = yBase - 10.0
 
-    # keep your existing "boxy w" construction, just widened + matched apertures
     w_outer = pen.line([(wx1, w_top), (wx1, w_bot), (wx3, w_bot), (wx3, w_top)])
     w_mid = pen.vline(wx2, w_top, w_bot)
     glyphs["w"] = (pen.union(w_outer, w_mid), Ww)
@@ -789,24 +851,20 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     x_bot = yBase - 10.0
     glyphs["x"] = (pen.union(pen.line([(x1, x_top), (x2, x_bot)]), pen.line([(x2, x_top), (x1, x_bot)])), W)
 
-    # y: like "u", but the RIGHT stem continues down into a descender (like p/q)
     yx1 = xL + 50.0
     yx2 = xR - 50.0
     y_top = yXTop + 20.0
     y_bot = yBase - 10.0
 
-    # match the p/q descender logic you liked (no clamp)
     desc_len = (yXTop - yAsc)
     y_desc_bot = yBase + desc_len
 
     y_shape = pen.union(
-        pen.vline(yx1, y_top, y_bot),        # left stem
-        pen.hline(yx1, yx2, y_bot),          # bottom
-        pen.vline(yx2, y_top, y_desc_bot),   # right stem + descender
+        pen.vline(yx1, y_top, y_bot),
+        pen.hline(yx1, yx2, y_bot),
+        pen.vline(yx2, y_top, y_desc_bot),
     )
-
     glyphs["y"] = (y_shape, W)
-
 
     z_top = yXTop + 30.0
     z_bot = yBase - 10.0
@@ -834,6 +892,7 @@ def main() -> None:
 
     upper = build_uppercase(m, pen)
     lower = build_lowercase(m, pen)
+    digits = build_digits(m, pen)
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -848,6 +907,12 @@ def main() -> None:
 
     for ch in "abcdefghijklmnopqrstuvwxyz":
         g, w = lower[ch]
+        fname = codepoint_filename(ch)
+        write_svg(out / fname, w, m, g)
+        preview.append((ch, fname))
+
+    for ch in "0123456789":
+        g, w = digits[ch]
         fname = codepoint_filename(ch)
         write_svg(out / fname, w, m, g)
         preview.append((ch, fname))
