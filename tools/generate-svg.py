@@ -743,28 +743,34 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     e_pts = [bar_start, bar_end] + arc_pts[1:]
     glyphs["e"] = (pen.line(e_pts), W)
 
-    # f
+    # f (stem + top hook as ONE smooth continuous stroke)
     fx = cx - 65.0
     f_top = yAsc + 10.0
     f_bot = yBase - 10.0
-    f_stem = pen.vline(fx, f_top, f_bot)
 
-    hook_cx = fx + 110.0
-    hook_cy = f_top + 35.0
-    hook_rx = 110.0
-    hook_ry = 50.0
+    hook_rx = 150.0
+    hook_ry = 80.0
+    hook_cx = fx + hook_rx
+    hook_cy = f_top
+
+    # End while still visually "up" (300–340 is a good range)
+    hook_end_deg = 330.0
+
     hook_pts = ellipse_arc_points(
         hook_cx, hook_cy, hook_rx, hook_ry,
-        180.0, 25.0,
-        clockwise=False,
-        steps=120
+        180.0, hook_end_deg,
+        clockwise=False,   # <-- key change: makes it rise first in y-down coords
+        steps=160
     )
-    f_hook = pen.line(hook_pts)
+    hook_pts[0] = (fx, f_top)  # exact join
+
+    f_stem_hook = pen.line([(fx, f_bot), (fx, f_top)] + hook_pts[1:])
 
     f_cross_y = yXTop + 110.0
     f_cross = pen.hline(fx, fx + 235.0, f_cross_y)
 
-    glyphs["f"] = (pen.union(f_stem, f_hook, f_cross), W)
+    glyphs["f"] = (pen.union(f_stem_hook, f_cross), W)
+
 
     # g
     g_cx, g_cy = bcX - 20.0, bcY - 10.0
