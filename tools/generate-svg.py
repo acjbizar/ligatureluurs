@@ -564,33 +564,43 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
 
-    # 6 (proper 6: shorter bowl + single smooth terminal; no self-intersection artifacts)
+    # 6 (bowl sits on baseline like other round-bottom glyphs)
+    six_rx = orx * 0.92
+    six_ry = ory * 0.60
+
     six_cx = cx + 15.0
-    six_cy = yMid + ory * 0.06
-    six_rx = orx * 0.96
-    six_ry = ory * 0.64          # less tall bowl
+
+    # Anchor bottom of the *stroke* to baseline:
+    # bottom painted y = six_cy + six_ry + pen.r  == yBase
+    six_cy = yBase - (six_ry + pen.r)
 
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
-    # join at left-middle of bowl
-    join = (six_cx - six_rx, six_cy)
+    # join at left-middle of the bowl
+    join_x, join_y = (six_cx - six_rx, six_cy)
 
-    # terminal ellipse whose LEFTMOST point is at the join (tangent match)
-    term_rx = six_rx * 1.10
-    term_ry = six_ry * 1.55
-    term_cx = join[0] + term_rx
-    term_cy = join[1]
+    # terminal arc (same tangency join)
+    # terminal arc (same tangency join) — make it reach up near the cap
+    term_rx = six_rx * 1.18
 
-    # one smooth arc: from 180 (join) up (270) right and down a bit (~15–25)
-    term_start_deg = 180.0
-    term_end_deg = 18.0
+    # Target the top of the terminal near the cap-top (with a small margin)
+    target_top = yTop + pen.r * 0.35
 
-    term_pts = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry,
-                                  term_start_deg, term_end_deg,
-                                  clockwise=False, steps=260)
+    # For this ellipse, top is at (term_cy - term_ry) and term_cy == join_y
+    term_ry_needed = max(0.0, join_y - target_top)
 
-    # force a tiny overlap into the bowl so union is guaranteed and looks connected
-    term_pts[0] = (join[0] + pen.r * 0.90, join[1])   # nudged inside the bowl
+    # Use whichever is larger: the old proportion or what's needed to reach target_top
+    term_ry = max(six_ry * 1.55, term_ry_needed)
+
+    term_cx = join_x + term_rx
+    term_cy = join_y
+
+    term_pts = ellipse_arc_points(
+        term_cx, term_cy, term_rx, term_ry,
+        180.0, 325.0,
+        clockwise=False,
+        steps=260
+    )
 
     six_term = pen.line(term_pts)
 
