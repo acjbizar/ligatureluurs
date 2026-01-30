@@ -587,37 +587,43 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
 
-    # 6 (full height like capital O: bottom at yBase, top at yTop; shorter terminal)
+    # 6 (match capital O height: outer top/bottom like cap O; shorter terminal)
+    yTop  = m.CAP_TOP
+    yBase = m.BASE
+
     six_rx = orx * 0.92
     six_ry = ory * 0.60
     six_cx = cx + 15.0
 
-    # Bowl: bottom of stroke sits on baseline (like cap O)
-    six_cy = yBase - (six_ry + pen.r)
+    # IMPORTANT:
+    # Make the OUTER bottom match cap "O" outer bottom.
+    # cap O outer bottom is yBase + pen.r (because ellipse_stroke expands by pen.r).
+    # So we set bowl center so: cy + ry + pen.r == yBase + pen.r  -> cy = yBase - ry
+    six_cy = yBase - six_ry
+
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
     # Join at left-middle of bowl
     join_x, join_y = (six_cx - six_rx, six_cy)
 
-    # Terminal ellipse: leftmost point is the join (angle 180)
+    # Terminal ellipse that connects at leftmost point (angle 180)
     term_rx = six_rx * 1.16
     term_cx = join_x + term_rx
     term_cy = join_y
 
-    # Make the TOP of the terminal stroke hit yTop exactly.
-    # The highest point is at 270°, y = term_cy - term_ry, then stroke adds pen.r.
-    term_ry = term_cy - (yTop + pen.r)
-    term_ry = max(term_ry, six_ry * 1.05)  # safety
+    # IMPORTANT:
+    # Make the OUTER top match cap "O" outer top.
+    # cap O outer top is yTop - pen.r, and terminal outer top is term_cy - term_ry - pen.r
+    # Set equal -> term_ry = term_cy - yTop
+    term_ry = max(six_ry * 1.05, term_cy - yTop)
 
-    # Shorter terminal: end before it wraps too far
-    TERMINAL_END_DEG = 305.0  # try 295..315
+    # Terminal continues less long
+    TERMINAL_END_DEG = 302.0   # try 295..310
 
-    # IMPORTANT: force the arc to include 270° exactly (so we truly reach yTop)
+    # Force the arc to include 270° apex so it truly reaches the top
     pts1 = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry, 180.0, 270.0, clockwise=False, steps=140)
     pts2 = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry, 270.0, TERMINAL_END_DEG, clockwise=False, steps=140)[1:]
-    term_pts = pts1 + pts2
-
-    six_term = pen.line(term_pts)
+    six_term = pen.line(pts1 + pts2)
 
     glyphs["6"] = (pen.union(six_bowl, six_term), W)
 
@@ -645,38 +651,11 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["8"] = (eight, W)
 
 
-    # 9 (mirror of 6: shorter bowl + single smooth terminal)
-    nine_cx = cx + 15.0
-    nine_cy = yMid - ory * 0.06
-    nine_rx = orx * 0.96
-    nine_ry = ory * 0.64
-
-    nine_bowl = pen.ellipse_stroke(nine_cx, nine_cy, nine_rx, nine_ry)
-
-    # join at right-middle of bowl
-    join = (nine_cx + nine_rx, nine_cy)
-
-    # terminal ellipse whose RIGHTMOST point is at the join
-    term_rx = nine_rx * 1.10
-    term_ry = nine_ry * 1.55
-    term_cx = join[0] - term_rx
-    term_cy = join[1]
-
-    # smooth arc: from 0 (join) down (90) left (180) and up a bit (~200)
-    term_start_deg = 0.0
-    term_end_deg = 200.0
-
-    term_pts = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry,
-                                  term_start_deg, term_end_deg,
-                                  clockwise=False, steps=260)
-
-    # tiny overlap into the bowl
-    term_pts[0] = (join[0] - pen.r * 0.90, join[1])
-
-    nine_term = pen.line(term_pts)
-
-    glyphs["9"] = (pen.union(nine_bowl, nine_term), W)
-
+    # 9 = 6 rotated 180° (exactly), around the digit box center
+    g6, _w = glyphs["6"]
+    origin = (W / 2.0, (m.CAP_TOP + m.BASE) / 2.0)  # center of cap-height box
+    g9 = affinity.rotate(g6, 180.0, origin=origin)
+    glyphs["9"] = (g9, W)
 
 
 
