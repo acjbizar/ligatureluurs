@@ -468,34 +468,57 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     one_flag = pen.line([(cx - orx * 0.28, yTop + ory * 0.22), (one_x, yTop)])
     glyphs["1"] = (pen.union(one_stem, one_base, one_flag), W)
 
-    # 2 (arc smoothly into a straight diagonal to bottom-left)
-    y2_cy = yTop + ory * 0.42
-    rx2, ry2 = orx, ory * 0.42
+    # 2 (SVG-based shape, then stretch vertically so it matches digit height)
+    cap_h = (yBase - yTop)
 
-    # End arc before the absolute rightmost so tangent already heads down-right
-    arc_end_deg = 340.0
-    arc2_pts = ellipse_arc_points(cx, y2_cy, rx2, ry2, 180.0, arc_end_deg, clockwise=False, steps=220)
-    p_end = arc2_pts[-1]
+    def X(frac: float) -> float:
+        return W * frac
 
-    diag_end = (xL, yBase)
-    p_join = (cx + orx * 0.38, yMid + ory * 0.30)  # join where diagonal becomes straight
+    def Y(t: float) -> float:
+        return yTop + cap_h * t
 
-    # Tangent at arc end
-    t = math.radians(arc_end_deg)
-    tvx, tvy = (-rx2 * math.sin(t), ry2 * math.cos(t))
-    ux, uy = norm(tvx, tvy)
-    p1 = (p_end[0] + ux * (orx * 0.35), p_end[1] + uy * (orx * 0.35))
+    # SVG points (700×1000 preview coordinates mapped into yTop..yBase)
+    p0  = (X(190/700), Y((260-40)/740))
+    c01 = (X(240/700), Y((150-40)/740))
+    c02 = (X(420/700), Y((130-40)/740))
+    p1  = (X(500/700), Y((220-40)/740))
 
-    # Make end tangent EXACTLY the diagonal direction (so no kink when it becomes a line)
-    dx, dy = (diag_end[0] - p_join[0], diag_end[1] - p_join[1])
-    dux, duy = norm(dx, dy)
-    p2 = (p_join[0] - dux * (orx * 0.55), p_join[1] - duy * (orx * 0.55))
+    c11 = (X(560/700), Y((290-40)/740))
+    c12 = (X(520/700), Y((390-40)/740))
+    p2  = (X(420/700), Y((460-40)/740))
 
-    bridge = cubic_points(p_end, p1, p2, p_join, steps=90)
+    c21 = (X(350/700), Y((510-40)/740))
+    c22 = (X(300/700), Y((540-40)/740))
+    p3  = (X(260/700), Y((610-40)/740))
 
-    two_stroke = pen.line(arc2_pts + bridge[1:] + [diag_end])
-    two_base = pen.hline(xL, xR, yBase)
-    glyphs["2"] = (pen.union(two_stroke, two_base), W)
+    p4  = (X(170/700), yBase)   # bottom-left
+    p5  = (X(520/700), yBase)   # baseline end
+
+    # --- stretch vertically around baseline so the top is closer to yTop ---
+    shape_pts = [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
+    y_min = min(y for _, y in shape_pts)  # highest point (smallest y)
+
+    # target top: bring the top close to yTop (tweak factor if you want)
+    target_top = yTop + pen.r * 0.35
+
+    # scale factor about baseline (keeps yBase fixed)
+    s = (yBase - target_top) / (yBase - y_min)
+    s = max(1.0, min(s, 1.45))  # clamp to avoid overshoot
+
+    def SY(pt):
+        x, y = pt
+        # baseline points stay baseline automatically
+        return (x, yBase - (yBase - y) * s)
+
+    p0, c01, c02, p1, c11, c12, p2, c21, c22, p3 = map(SY, [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3])
+
+    seg0 = cubic_points(p0, c01, c02, p1, steps=90)
+    seg1 = cubic_points(p1, c11, c12, p2, steps=90)[1:]
+    seg2 = cubic_points(p2, c21, c22, p3, steps=90)[1:]
+
+    two_pts = seg0 + seg1 + seg2 + [p4, p5]
+    glyphs["2"] = (pen.line(two_pts), W)
+
 
 
     # 3 (top/bottom bars curve inward on the left WITHOUT S-curving back)
