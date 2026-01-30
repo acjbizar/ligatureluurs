@@ -799,6 +799,7 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
+
     n_aperture = (xR - 40.0) - (xL + 40.0)
 
     Wm = W + n_aperture
@@ -809,16 +810,32 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     m_x3 = m_x2 + n_aperture
     m_top = yXTop + 20.0
 
-    m_pts = [
-        (m_x1, yBase),
-        (m_x1, m_top),
-        (m_x2, m_top),
-        (m_x2, yBase),
-        (m_x2, m_top),
-        (m_x3, m_top),
-        (m_x3, yBase),
-    ]
+    # Only curve the RIGHTMOST shoulder (into m_x3)
+    curve_dx = n_aperture * 0.55
+    curve_dy = (yBase - m_top) * 0.38
+    k = 0.62
+
+    # Safety: ensure the curve starts to the right of m_x2
+    curve_dx = min(curve_dx, (m_x3 - m_x2) - pen.r * 0.25)
+
+    p0 = (m_x3 - curve_dx, m_top)          # start of bend on top bar
+    p3 = (m_x3, m_top + curve_dy)          # end of bend on the right stem
+
+    # cubic: horizontal tangent at start, vertical tangent at end
+    c1 = (p0[0] + curve_dx * k, p0[1])
+    c2 = (p3[0], p3[1] - curve_dy * k)
+
+    shoulder = cubic_points(p0, c1, c2, p3, steps=90)
+
+    m_pts: List[Tuple[float, float]] = []
+    m_pts += [(m_x1, yBase), (m_x1, m_top)]                 # left stem up
+    m_pts += [(m_x2, m_top), (m_x2, yBase), (m_x2, m_top)]  # middle stem: top corner stays "hard"
+    m_pts += [p0]                                           # straight top bar to curve start
+    m_pts += shoulder[1:]                                   # curve into right stem
+    m_pts += [(m_x3, yBase)]                                # right stem down
+
     glyphs["m"] = (pen.line(m_pts), Wm)
+
 
     n_x1 = xL + 40.0
     n_x2 = xR - 40.0
