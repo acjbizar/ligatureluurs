@@ -468,27 +468,59 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     one_flag = pen.line([(cx - orx * 0.28, yTop + ory * 0.22), (one_x, yTop)])
     glyphs["1"] = (pen.union(one_stem, one_base, one_flag), W)
 
-    # 2 (top arc + diagonal + base, all within frame)
+    # 2 (arc smoothly into a straight diagonal to bottom-left)
     y2_cy = yTop + ory * 0.42
     rx2, ry2 = orx, ory * 0.42
-    arc2 = pen.line(ellipse_arc_points(cx, y2_cy, rx2, ry2, 180.0, 360.0, clockwise=False, steps=220))
-    p2_topR = ellipse_point(cx, y2_cy, rx2, ry2, 360.0)
-    diag2 = pen.line([p2_topR, (xL + orx * 0.10, yBase)])
-    base2 = pen.hline(xL, xR, yBase)
-    glyphs["2"] = (pen.union(arc2, diag2, base2), W)
 
-    # 3 (your “good” style: three bars + two right half-loops, but normalized)
+    # End arc before the absolute rightmost so tangent already heads down-right
+    arc_end_deg = 340.0
+    arc2_pts = ellipse_arc_points(cx, y2_cy, rx2, ry2, 180.0, arc_end_deg, clockwise=False, steps=220)
+    p_end = arc2_pts[-1]
+
+    diag_end = (xL, yBase)
+    p_join = (cx + orx * 0.38, yMid + ory * 0.30)  # join where diagonal becomes straight
+
+    # Tangent at arc end
+    t = math.radians(arc_end_deg)
+    tvx, tvy = (-rx2 * math.sin(t), ry2 * math.cos(t))
+    ux, uy = norm(tvx, tvy)
+    p1 = (p_end[0] + ux * (orx * 0.35), p_end[1] + uy * (orx * 0.35))
+
+    # Make end tangent EXACTLY the diagonal direction (so no kink when it becomes a line)
+    dx, dy = (diag_end[0] - p_join[0], diag_end[1] - p_join[1])
+    dux, duy = norm(dx, dy)
+    p2 = (p_join[0] - dux * (orx * 0.55), p_join[1] - duy * (orx * 0.55))
+
+    bridge = cubic_points(p_end, p1, p2, p_join, steps=90)
+
+    two_stroke = pen.line(arc2_pts + bridge[1:] + [diag_end])
+    two_base = pen.hline(xL, xR, yBase)
+    glyphs["2"] = (pen.union(two_stroke, two_base), W)
+
+
+    # 3 (top/bottom bars curve inward on the left WITHOUT S-curving back)
     y3_top = yTop + ory * 0.10
     y3_mid = yMid
     y3_bot = yBase - ory * 0.10
 
     x3_left = xL + orx * 0.05
-    bulge3 = orx * 0.55
+    bulge3  = orx * 0.55
     x3_join = xR - bulge3
 
-    three_top = pen.hline(x3_left, x3_join, y3_top)
+    # Move the left endpoints toward the middle so the curve is one-directional
+    top_left_y = y3_top + ory * 0.10    # down toward middle
+    bot_left_y = y3_bot - ory * 0.10    # up toward middle
+
+    def one_way_bar(yR: float, yL: float) -> Geom:
+        p0 = (x3_join, yR)
+        p3 = (x3_left, yL)
+        c1 = (x3_join - orx * 0.55, yR)      # keep right side steady
+        c2 = (x3_left + orx * 0.12, yL)      # shape happens near left
+        return pen.line(cubic_points(p0, c1, c2, p3, steps=90))
+
+    three_top = one_way_bar(y3_top, top_left_y)
     three_mid = pen.hline(x3_left + orx * 0.14, x3_join, y3_mid)
-    three_bot = pen.hline(x3_left, x3_join, y3_bot)
+    three_bot = one_way_bar(y3_bot, bot_left_y)
 
     cy_u = (y3_top + y3_mid) / 2.0
     ry_u = (y3_mid - y3_top) / 2.0
@@ -499,6 +531,7 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     lower_loop = pen.line(ellipse_arc_points(x3_join, cy_l, bulge3, ry_l, 270.0, 90.0, clockwise=False, steps=220))
 
     glyphs["3"] = (pen.union(three_top, three_mid, three_bot, upper_loop, lower_loop), W)
+
 
     # 4 (your approved construction: crossbar + stem + single diagonal to top of stem)
     x4_stem = xR
@@ -530,52 +563,97 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     five_loop = pen.line(ellipse_arc_points(x5_join, cy5, bulge5, ry5, 270.0, 90.0, clockwise=False, steps=240))
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    # 6 (your current “single smooth arc into bowl” approach, but normalized so it matches 0/8/9)
-    # bowl = same as 0
-    six_bowl_pts = ellipse_arc_points(cx, yMid, orx, ory, 180.0, 180.0, clockwise=False, steps=520)
+
+    # 6 (proper 6: shorter bowl + single smooth terminal; no self-intersection artifacts)
+    six_cx = cx + 15.0
+    six_cy = yMid + ory * 0.06
+    six_rx = orx * 0.96
+    six_ry = ory * 0.64          # less tall bowl
+
+    six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
     # join at left-middle of bowl
-    join_x, join_y = (cx - orx, yMid)
+    join = (six_cx - six_rx, six_cy)
 
-    # terminal arc ellipse (upper sweep only; not too long)
-    term_rx = orx * 1.25
-    term_ry = ory * 1.05
-    term_cx = join_x + term_rx
-    term_cy = join_y
+    # terminal ellipse whose LEFTMOST point is at the join (tangent match)
+    term_rx = six_rx * 1.10
+    term_ry = six_ry * 1.55
+    term_cx = join[0] + term_rx
+    term_cy = join[1]
 
-    term_start_deg = 285.0   # shorter crown
-    term_end_deg = 180.0     # leftmost = join
+    # one smooth arc: from 180 (join) up (270) right and down a bit (~15–25)
+    term_start_deg = 180.0
+    term_end_deg = 18.0
+
     term_pts = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry,
                                   term_start_deg, term_end_deg,
-                                  clockwise=True, steps=240)
-    term_pts[-1] = (join_x, join_y)  # exact join
-    six_bowl_pts[0] = (join_x, join_y)
+                                  clockwise=False, steps=260)
 
-    glyphs["6"] = (pen.line(term_pts + six_bowl_pts[1:]), W)
+    # force a tiny overlap into the bowl so union is guaranteed and looks connected
+    term_pts[0] = (join[0] + pen.r * 0.90, join[1])   # nudged inside the bowl
+
+    six_term = pen.line(term_pts)
+
+    glyphs["6"] = (pen.union(six_bowl, six_term), W)
+
 
     # 7 (top bar + diagonal, normalized)
     seven_top = pen.hline(xL, xR, yTop + ory * 0.08)
     seven_diag = pen.line([(xR, yTop + ory * 0.08), (xL + orx * 0.18, yBase)])
     glyphs["7"] = (pen.union(seven_top, seven_diag), W)
 
-    # 8 (two loops, same family radii)
-    cy8_top = yTop + ory * 0.42
-    cy8_bot = yBase - ory * 0.42
-    rx8_top, ry8_top = orx * 0.78, ory * 0.42
-    rx8_bot, ry8_bot = orx * 0.88, ory * 0.48
+    # 8 (centerlines separate, stroke outlines overlap slightly => one solid figure-8)
+    rx8_top, ry8_top = orx * 0.94, ory * 0.40
+    rx8_bot, ry8_bot = orx * 1.02, ory * 0.46
+
+    overlap_outline = pen.r * 0.80
+    dy = (ry8_top + ry8_bot) + 2.0 * pen.r - overlap_outline
+
+    cy8_top = yMid - dy / 2.0
+    cy8_bot = yMid + dy / 2.0
+
     eight = pen.union(
         pen.ellipse_stroke(cx, cy8_top, rx8_top, ry8_top),
         pen.ellipse_stroke(cx, cy8_bot, rx8_bot, ry8_bot),
     )
+
     glyphs["8"] = (eight, W)
 
-    # 9 (loop + right stem; loop size matches 0-family better than before)
-    cy9 = yMid - ory * 0.18
-    rx9, ry9 = orx * 0.92, ory * 0.72
-    nine_loop = pen.ellipse_stroke(cx, cy9, rx9, ry9)
-    nine_stem_x = cx + rx9
-    nine_stem = pen.vline(nine_stem_x, cy9, yBase)
-    glyphs["9"] = (pen.union(nine_loop, nine_stem), W)
+
+    # 9 (mirror of 6: shorter bowl + single smooth terminal)
+    nine_cx = cx + 15.0
+    nine_cy = yMid - ory * 0.06
+    nine_rx = orx * 0.96
+    nine_ry = ory * 0.64
+
+    nine_bowl = pen.ellipse_stroke(nine_cx, nine_cy, nine_rx, nine_ry)
+
+    # join at right-middle of bowl
+    join = (nine_cx + nine_rx, nine_cy)
+
+    # terminal ellipse whose RIGHTMOST point is at the join
+    term_rx = nine_rx * 1.10
+    term_ry = nine_ry * 1.55
+    term_cx = join[0] - term_rx
+    term_cy = join[1]
+
+    # smooth arc: from 0 (join) down (90) left (180) and up a bit (~200)
+    term_start_deg = 0.0
+    term_end_deg = 200.0
+
+    term_pts = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry,
+                                  term_start_deg, term_end_deg,
+                                  clockwise=False, steps=260)
+
+    # tiny overlap into the bowl
+    term_pts[0] = (join[0] - pen.r * 0.90, join[1])
+
+    nine_term = pen.line(term_pts)
+
+    glyphs["9"] = (pen.union(nine_bowl, nine_term), W)
+
+
+
 
     for ch in "0123456789":
         glyphs.setdefault(ch, (Polygon(), W))
