@@ -988,6 +988,7 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--chars", type=str, default="", help="Generate only these characters (e.g. --chars n or --chars aen012)")
     ap.add_argument("--out", type=Path, default=Path("sketches"))
     ap.add_argument("--stroke", type=float, default=90.0)
     ap.add_argument("--resolution", type=int, default=64)
@@ -1005,20 +1006,18 @@ def main() -> None:
 
     preview: List[Tuple[str, str]] = []
 
-    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        g, w = upper[ch]
-        fname = codepoint_filename(ch)
-        write_svg(out / fname, w, m, g)
-        preview.append((ch, fname))
+    chars = args.chars or ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "abcdefghijklmnopqrstuvwxyz" + "0123456789")
 
-    for ch in "abcdefghijklmnopqrstuvwxyz":
-        g, w = lower[ch]
-        fname = codepoint_filename(ch)
-        write_svg(out / fname, w, m, g)
-        preview.append((ch, fname))
+    for ch in chars:
+        if ch in upper:
+            g, w = upper[ch]
+        elif ch in lower:
+            g, w = lower[ch]
+        elif ch in digits:
+            g, w = digits[ch]
+        else:
+            continue
 
-    for ch in "0123456789":
-        g, w = digits[ch]
         fname = codepoint_filename(ch)
         write_svg(out / fname, w, m, g)
         preview.append((ch, fname))
