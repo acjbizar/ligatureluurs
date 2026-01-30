@@ -778,17 +778,48 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["g"] = (pen.union(g_bowl, g_stem, g_hook), W)
 
     # h
+    # h (only the TOP-RIGHT shoulder bends)
     hxL = xL + 40.0
     hxR = xR - 40.0
     h_top_y = yXTop + 20.0
+
     h_left = pen.vline(hxL, yAsc, yBase)
-    h_shoulder = pen.line([(hxL, h_top_y), (hxR, h_top_y), (hxR, yBase)])
+
+    # Curve tuning
+    curve_dx = (hxR - hxL) * 0.40         # how long the shoulder runs before turning down
+    curve_dy = (yBase - h_top_y) * 0.28   # how far it drops while turning into the right stem
+    k = 0.62
+
+    # Keep bend reasonable
+    curve_dx = min(curve_dx, (hxR - hxL) - pen.r * 0.25)
+    curve_dy = min(curve_dy, (yBase - h_top_y) - pen.r * 0.25)
+
+    p0 = (hxR - curve_dx, h_top_y)        # start of bend on the shoulder (horizontal)
+    p3 = (hxR, h_top_y + curve_dy)        # end of bend on right stem (vertical down)
+
+    # cubic: horizontal tangent at start, vertical tangent at end
+    c1 = (p0[0] + curve_dx * k, p0[1])
+    c2 = (p3[0], p3[1] - curve_dy * k)
+
+    bend = cubic_points(p0, c1, c2, p3, steps=90)
+
+    h_shoulder_pts: List[Tuple[float, float]] = []
+    h_shoulder_pts += [(hxL, h_top_y), p0]   # straight shoulder into curve
+    h_shoulder_pts += bend[1:]              # smooth bend into the right stem
+    h_shoulder_pts += [(hxR, yBase)]         # continue down (tangent matches)
+
+    h_shoulder = pen.line(h_shoulder_pts)
+
     glyphs["h"] = (pen.union(h_left, h_shoulder), W)
 
+
+    # i
     ix = cx
     glyphs["i"] = (pen.union(pen.vline(ix, yXTop + 20.0, yBase), pen.dot(ix, dot_y, dot_r)), W)
+    # j
     glyphs["j"] = (pen.union(pen.vline(ix, yXTop + 20.0, yDesc - 10.0), pen.dot(ix, dot_y, dot_r)), W)
 
+    # k
     kx = xL + 40.0
     ky_mid = (yXTop + yBase) / 2.0
     glyphs["k"] = (pen.union(
@@ -797,9 +828,10 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(kx, ky_mid), (xR - 10.0, yBase - 20.0)]),
     ), W)
 
+    # l
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
-
+    # m
     n_aperture = (xR - 40.0) - (xL + 40.0)
 
     Wm = W + n_aperture
@@ -837,6 +869,7 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["m"] = (pen.line(m_pts), Wm)
 
 
+    # n
     n_x1 = xL + 40.0
     n_x2 = xR - 40.0
     n_top = yXTop + 20.0
@@ -860,6 +893,7 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["n"] = (pen.line(n_pts), W)
 
 
+    # o
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
     desc_len = (yXTop - yAsc)
@@ -947,14 +981,43 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(t_left, t_right, t_cross_y),
     ), W)
 
+    # u
     ux1 = xL + 50.0
     ux2 = xR - 50.0
     u_top = yXTop + 20.0
     u_bot = yBase - 10.0
-    glyphs["u"] = (pen.line([(ux1, u_top), (ux1, u_bot), (ux2, u_bot), (ux2, u_top)]), W)
 
+    # Only the LEFT bottom "shoulder" bends (left stem -> bottom bar).
+    curve_dx = (ux2 - ux1) * 0.32
+    curve_dy = (u_bot - u_top) * 0.34
+    k = 0.62
+
+    # Keep the bend reasonable
+    curve_dx = min(curve_dx, (ux2 - ux1) - pen.r * 0.25)
+    curve_dy = min(curve_dy, (u_bot - u_top) - pen.r * 0.25)
+
+    # Corner is at (ux1, u_bot). Round it with a cubic from vertical -> horizontal.
+    p0 = (ux1, u_bot - curve_dy)          # start of bend on left stem (going DOWN)
+    p3 = (ux1 + curve_dx, u_bot)          # end of bend on bottom bar (going RIGHT)
+
+    # cubic: vertical tangent at start, horizontal tangent at end
+    c1 = (p0[0], p0[1] + curve_dy * k)
+    c2 = (p3[0] - curve_dx * k, p3[1])
+
+    bend = cubic_points(p0, c1, c2, p3, steps=90)
+
+    u_pts: List[Tuple[float, float]] = []
+    u_pts += [(ux1, u_top), p0]           # left stem down to bend start
+    u_pts += bend[1:]                     # smooth bend into bottom bar
+    u_pts += [(ux2, u_bot), (ux2, u_top)] # bottom bar to right, then right stem up (hard corner)
+
+    glyphs["u"] = (pen.line(u_pts), W)
+
+
+    # v
     glyphs["v"] = (pen.line([(xL + 60.0, yXTop + 20.0), (cx, yBase), (xR - 60.0, yXTop + 20.0)]), W)
 
+    # w
     Ww = W + n_aperture
     xLw, xRw = 110.0, Ww - 110.0
 
@@ -964,16 +1027,44 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     w_top = yXTop + 20.0
     w_bot = yBase - 10.0
 
-    w_outer = pen.line([(wx1, w_top), (wx1, w_bot), (wx3, w_bot), (wx3, w_top)])
+    # Only the LEFT bottom "shoulder" bends (left stem -> bottom bar).
+    curve_dx = n_aperture * 0.55
+    curve_dy = (w_bot - w_top) * 0.38
+    k = 0.62
+
+    # Keep the bend confined to the left bay (to the left of the middle stem)
+    curve_dx = min(curve_dx, (wx2 - wx1) - pen.r * 0.25)
+    curve_dy = min(curve_dy, (w_bot - w_top) - pen.r * 0.25)
+
+    # Corner is at (wx1, w_bot). We round it with a cubic from vertical -> horizontal.
+    p0 = (wx1, w_bot - curve_dy)          # start of bend on left stem (going DOWN)
+    p3 = (wx1 + curve_dx, w_bot)          # end of bend on bottom bar (going RIGHT)
+
+    # cubic: vertical tangent at start, horizontal tangent at end
+    c1 = (p0[0], p0[1] + curve_dy * k)
+    c2 = (p3[0] - curve_dx * k, p3[1])
+
+    bend = cubic_points(p0, c1, c2, p3, steps=90)
+
+    w_outer_pts: List[Tuple[float, float]] = []
+    w_outer_pts += [(wx1, w_top), p0]         # left stem down to bend start
+    w_outer_pts += bend[1:]                   # smooth bend into bottom bar
+    w_outer_pts += [(wx3, w_bot), (wx3, w_top)]  # bottom bar to right, then right stem up
+
+    w_outer = pen.line(w_outer_pts)
     w_mid = pen.vline(wx2, w_top, w_bot)
+
     glyphs["w"] = (pen.union(w_outer, w_mid), Ww)
 
+
+    # x
     x1 = xL + 55.0
     x2 = xR - 55.0
     x_top = yXTop + 30.0
     x_bot = yBase - 10.0
     glyphs["x"] = (pen.union(pen.line([(x1, x_top), (x2, x_bot)]), pen.line([(x2, x_top), (x1, x_bot)])), W)
 
+    # y
     yx1 = xL + 50.0
     yx2 = xR - 50.0
     y_top = yXTop + 20.0
@@ -982,12 +1073,33 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     desc_len = (yXTop - yAsc)
     y_desc_bot = yBase + desc_len
 
-    y_shape = pen.union(
-        pen.vline(yx1, y_top, y_bot),
-        pen.hline(yx1, yx2, y_bot),
-        pen.vline(yx2, y_top, y_desc_bot),
-    )
-    glyphs["y"] = (y_shape, W)
+    # Only the LEFT bottom "shoulder" bends (left stem -> bottom bar).
+    curve_dx = (yx2 - yx1) * 0.32
+    curve_dy = (y_bot - y_top) * 0.34
+    k = 0.62
+
+    curve_dx = min(curve_dx, (yx2 - yx1) - pen.r * 0.25)
+    curve_dy = min(curve_dy, (y_bot - y_top) - pen.r * 0.25)
+
+    # Round the corner at (yx1, y_bot) with a cubic from vertical -> horizontal
+    p0 = (yx1, y_bot - curve_dy)          # start of bend on left stem
+    p3 = (yx1 + curve_dx, y_bot)          # end of bend on bottom bar
+
+    c1 = (p0[0], p0[1] + curve_dy * k)    # vertical tangent at start
+    c2 = (p3[0] - curve_dx * k, p3[1])    # horizontal tangent at end
+
+    bend = cubic_points(p0, c1, c2, p3, steps=90)
+
+    left_and_bar_pts: List[Tuple[float, float]] = []
+    left_and_bar_pts += [(yx1, y_top), p0]
+    left_and_bar_pts += bend[1:]
+    left_and_bar_pts += [(yx2, y_bot)]
+
+    left_and_bar = pen.line(left_and_bar_pts)
+    right_stem = pen.vline(yx2, y_top, y_desc_bot)   # keep this junction hard
+
+    glyphs["y"] = (pen.union(left_and_bar, right_stem), W)
+
 
     z_top = yXTop + 30.0
     z_bot = yBase - 10.0
