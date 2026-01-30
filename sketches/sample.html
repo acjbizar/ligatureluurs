@@ -6,14 +6,14 @@
     <title>Ligatureluurs — Interactive Sample</title>
 
     <style>
-        /* Load the built font(s). This page lives in sketches/, so fonts are in ../dist/fonts/ */
+        /* Variable font (VF) */
         @font-face {
             font-family: "Ligatureluurs";
             src:
                     url("../dist/fonts/ligatureluurs.woff2") format("woff2"),
                     url("../dist/fonts/ligatureluurs.woff") format("woff"),
                     url("../dist/fonts/ligatureluurs.ttf") format("truetype");
-            font-weight: 400;
+            font-weight: 1 1000; /* VF range; adjust if your axis range differs */
             font-style: normal;
             font-display: swap;
         }
@@ -29,6 +29,8 @@
             --line: 1.05;
             --track: 0em;
             --pad: 24px;
+
+            --wght: 400; /* NEW: variable weight */
 
             /* Optional overlay guides (approximate in CSS em-space) */
             --show-guides: 1;        /* 0 / 1 */
@@ -234,6 +236,11 @@
 
         .sample {
             font-family: "Ligatureluurs", sans-serif;
+
+            /* NEW: variable weight control */
+            font-weight: var(--wght);
+            font-variation-settings: "wght" var(--wght);
+
             font-size: var(--size);
             line-height: var(--line);
             letter-spacing: var(--track);
@@ -250,18 +257,14 @@
             background: rgba(255,255,255,.55);
         }
 
-        /* Approximate baseline/cap/x-height guides (toggleable).
-           These are visual helpers and not guaranteed to match real font metrics in CSS layout. */
+        /* Approx baseline/cap/x-height guides (toggleable) */
         .sample.guides::before {
             content: "";
             position: absolute;
             inset: 0;
             pointer-events: none;
             border-radius: 14px;
-
-            /* multiple repeating gradients to draw thin lines */
             background:
-                /* baseline */
                     linear-gradient(
                             to bottom,
                             transparent calc(var(--baseline-em) - 0.75px),
@@ -269,7 +272,6 @@
                             rgba(255,0,0,.25) calc(var(--baseline-em) + 0.75px),
                             transparent calc(var(--baseline-em) + 0.75px)
                     ),
-                        /* cap line */
                     linear-gradient(
                             to bottom,
                             transparent calc(var(--cap-em) - 0.75px),
@@ -277,7 +279,6 @@
                             rgba(0,128,255,.22) calc(var(--cap-em) + 0.75px),
                             transparent calc(var(--cap-em) + 0.75px)
                     ),
-                        /* x-height line */
                     linear-gradient(
                             to bottom,
                             transparent calc(var(--xh-em) - 0.75px),
@@ -303,6 +304,11 @@
         }
         .gcell .ch {
             font-family: "Ligatureluurs", sans-serif;
+
+            /* NEW: variable weight control in grid */
+            font-weight: var(--wght);
+            font-variation-settings: "wght" var(--wght);
+
             font-size: 44px;
             line-height: 1.05;
             letter-spacing: var(--track);
@@ -340,6 +346,12 @@
             <div class="row">
                 <label>Font size <small id="vSize"></small></label>
                 <input id="size" type="range" min="16" max="240" step="1" />
+            </div>
+
+            <!-- NEW: Weight slider -->
+            <div class="row">
+                <label>Weight <small id="vWght"></small></label>
+                <input id="wght" type="range" min="1" max="1000" step="1" />
             </div>
 
             <div class="row">
@@ -449,6 +461,7 @@
 
         const el = {
             size: document.getElementById("size"),
+            wght: document.getElementById("wght"),            // NEW
             line: document.getElementById("line"),
             track: document.getElementById("track"),
             pad: document.getElementById("pad"),
@@ -472,6 +485,7 @@
 
         const val = {
             vSize: document.getElementById("vSize"),
+            vWght: document.getElementById("vWght"),          // NEW
             vLine: document.getElementById("vLine"),
             vTrack: document.getElementById("vTrack"),
             vPad: document.getElementById("vPad"),
@@ -491,6 +505,7 @@
 
         const defaults = {
             size: 96,
+            wght: 400,      // NEW
             line: 1.05,
             track: 0,
             pad: 24,
@@ -506,7 +521,7 @@
             text: presets.hamburgefontsiv,
         };
 
-        const LS_KEY = "ligatureluurs.sample.settings.v1";
+        const LS_KEY = "ligatureluurs.sample.settings.v2";
 
         function loadSettings() {
             try {
@@ -531,6 +546,7 @@
 
         function updateLabels(s) {
             val.vSize.textContent = s.size + "px";
+            val.vWght.textContent = String(s.wght); // NEW
             val.vLine.textContent = s.line.toFixed(2);
             val.vTrack.textContent = s.track.toFixed(3) + "em";
             val.vPad.textContent = s.pad + "px";
@@ -541,13 +557,14 @@
             val.vXh.textContent = s.xh.toFixed(2) + "em";
 
             el.liveCss.textContent =
-                `font-size:${s.size}px; line-height:${s.line.toFixed(2)}; letter-spacing:${s.track.toFixed(3)}em; ` +
+                `font-size:${s.size}px; font-weight:${s.wght}; line-height:${s.line.toFixed(2)}; ` +
+                `letter-spacing:${s.track.toFixed(3)}em; ` +
                 `font-feature-settings:"liga" ${s.liga?1:0},"kern" ${s.kern?1:0};`;
         }
 
         function apply(s) {
-            // CSS vars
             setVar("--size", s.size + "px");
+            setVar("--wght", String(s.wght));   // NEW
             setVar("--line", String(s.line));
             setVar("--track", s.track + "em");
             setVar("--pad", s.pad + "px");
@@ -562,8 +579,8 @@
             setVar("--cap-em", s.cap + "em");
             setVar("--xh-em", s.xh + "em");
 
-            // UI controls
             el.size.value = s.size;
+            el.wght.value = s.wght;      // NEW
             el.line.value = s.line;
             el.track.value = s.track;
             el.pad.value = s.pad;
@@ -578,7 +595,6 @@
             el.xh.value = s.xh;
             el.text.value = s.text;
 
-            // sample content
             el.sample.textContent = s.text;
             el.sample.classList.toggle("guides", !!s.guides);
 
@@ -609,9 +625,10 @@
             }
         }
 
-        function bind(s) {
+        function bind() {
             const read = () => ({
                 size: clamp(parseInt(el.size.value, 10) || defaults.size, 1, 999),
+                wght: clamp(parseInt(el.wght.value, 10) || defaults.wght, 1, 1000), // NEW
                 line: clamp(parseFloat(el.line.value) || defaults.line, 0.5, 3.0),
                 track: clamp(parseFloat(el.track.value) || 0, -1, 2),
                 pad: clamp(parseInt(el.pad.value, 10) || 0, 0, 200),
@@ -631,6 +648,7 @@
 
             ["input", "change"].forEach(evt => {
                 el.size.addEventListener(evt, onAny);
+                el.wght.addEventListener(evt, onAny); // NEW
                 el.line.addEventListener(evt, onAny);
                 el.track.addEventListener(evt, onAny);
                 el.pad.addEventListener(evt, onAny);
@@ -663,6 +681,8 @@
                 const css = [
                     `font-family: "Ligatureluurs", sans-serif;`,
                     `font-size: ${cur.size}px;`,
+                    `font-weight: ${cur.wght};`,
+                    `font-variation-settings: "wght" ${cur.wght};`,
                     `line-height: ${cur.line.toFixed(2)};`,
                     `letter-spacing: ${cur.track.toFixed(3)}em;`,
                     `font-feature-settings: "liga" ${cur.liga ? 1 : 0}, "kern" ${cur.kern ? 1 : 0};`,
@@ -679,9 +699,7 @@
         }
 
         async function fontStatus() {
-            // Helps show if font loads, without being overly strict about file://
             try {
-                // Try to trigger load
                 await document.fonts.load('16px "Ligatureluurs"');
                 const ok = document.fonts.check('16px "Ligatureluurs"');
                 statusEl.textContent = ok ? "Font loaded ✔" : "Font not loaded (check paths / use a local server)";
@@ -692,9 +710,8 @@
 
         // init
         buildGlyphGrid();
-        const s = loadSettings();
-        bind(s);
-        apply(s);
+        bind();
+        apply(loadSettings());
         fontStatus();
     })();
 </script>
