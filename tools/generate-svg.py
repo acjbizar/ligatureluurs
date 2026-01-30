@@ -249,6 +249,11 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     CAP_RY = (yBase - yTop) / 2.0
     CAP_CX = cx
     CAP_CY = yMid
+    # Make round caps (C/G/O/Q) a bit wider without changing other caps.
+    # Tune ROUND_WIDEN in ~1.10 .. 1.18
+    ROUND_WIDEN = 1.14
+    ROUND_RX = min(CAP_RX * ROUND_WIDEN, (W / 2.0) - pen.r - 20.0)  # keep safe margin
+    ROUND_RY = CAP_RY
 
     glyphs: Dict[str, Tuple[Geom, float]] = {}
 
@@ -274,7 +279,8 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xFlat, xL, yBase),
     ), W)
 
-    glyphs["C"] = (pen.ellipse_arc(CAP_CX, CAP_CY, CAP_RX, CAP_RY, 45.0, 315.0, steps=280), W)
+    # C
+    glyphs["C"] = (pen.ellipse_arc(CAP_CX, CAP_CY, ROUND_RX, ROUND_RY, 45.0, 315.0, steps=280), W)
 
     xJoin = cx
     glyphs["D"] = (pen.union(
@@ -300,24 +306,29 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     # G (reverted construction; union pieces so it can't disconnect)
     g_a0 = 300.0
     g_a1 = 60.0
+
+    # Use widened ellipse frame for G
+    G_RX = ROUND_RX
+    G_RY = ROUND_RY
+
     g_end_y = CAP_CY + 110.0
-    g_end_sin = (g_end_y - CAP_CY) / CAP_RY
+    g_end_sin = (g_end_y - CAP_CY) / G_RY
     g_end_sin = max(-1.0, min(1.0, g_end_sin))
     g_a2 = math.degrees(math.asin(g_end_sin))  # ~17°
 
-    arc1_pts = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a0, g_a1, clockwise=True, steps=220)
-    arc2_pts = ellipse_arc_points(CAP_CX, CAP_CY, CAP_RX, CAP_RY, g_a1, g_a2, clockwise=True, steps=90)
+    arc1_pts = ellipse_arc_points(CAP_CX, CAP_CY, G_RX, G_RY, g_a0, g_a1, clockwise=True, steps=220)
+    arc2_pts = ellipse_arc_points(CAP_CX, CAP_CY, G_RX, G_RY, g_a1, g_a2, clockwise=True, steps=90)
 
     p0 = arc2_pts[-1]
-    p3 = (CAP_CX + CAP_RX * 0.773, CAP_CY)   # bar start
-    p4 = (CAP_CX + 35.0, CAP_CY)             # bar end
+    p3 = (CAP_CX + G_RX * 0.773, CAP_CY)   # bar start
+    p4 = (CAP_CX + 35.0, CAP_CY)           # bar end
 
     a = math.radians(g_a2)
-    tvx, tvy = (math.sin(a) * CAP_RX, -math.cos(a) * CAP_RY)  # clockwise tangent
+    tvx, tvy = (math.sin(a) * G_RX, -math.cos(a) * G_RY)  # clockwise tangent
     ux, uy = norm(tvx, tvy)
 
-    tlen1 = CAP_RX * 0.28
-    tlen2 = CAP_RX * 0.22
+    tlen1 = G_RX * 0.28
+    tlen2 = G_RX * 0.22
 
     p1 = (p0[0] + ux * tlen1, p0[1] + uy * tlen1)
     p2 = (p3[0] + tlen2, p3[1])  # horizontal end tangent into the bar
@@ -367,7 +378,8 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(xL, yTop), (xR, yBase)]),
     ), W)
 
-    O = pen.ellipse_stroke(CAP_CX, CAP_CY, CAP_RX, CAP_RY)
+    # O
+    O = pen.ellipse_stroke(CAP_CX, CAP_CY, ROUND_RX, ROUND_RY)
     glyphs["O"] = (O, W)
 
     glyphs["P"] = (pen.union(
@@ -377,20 +389,22 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xFlat, xL, yMid),
     ), W)
 
+    # Q
     q_tail = pen.line([
-        (CAP_CX + CAP_RX * 0.10, CAP_CY + CAP_RY * 0.38),
-        (CAP_CX + CAP_RX * 0.72, CAP_CY + CAP_RY * 0.96),
+        (CAP_CX + ROUND_RX * 0.10, CAP_CY + ROUND_RY * 0.38),
+        (CAP_CX + ROUND_RX * 0.72, CAP_CY + ROUND_RY * 0.96),
     ])
     glyphs["Q"] = (pen.union(O, q_tail), W)
 
+    # R
     glyphs["R"] = (pen.union(glyphs["P"][0], pen.line([(xFlat, yMid), (xR, yBase)])), W)
 
     # S (less dynamic + full cap height)
     S_y0 = yTop + 25.0
     S_y3 = yBase - 25.0
     S_h = S_y3 - S_y0
-    S_xL = xL + 75.0
-    S_xR = xR - 75.0
+    S_xL = xL + 45.0
+    S_xR = xR - 45.0
     S_w = S_xR - S_xL
 
     p0 = (S_xR, S_y0)
