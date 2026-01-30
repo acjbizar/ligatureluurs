@@ -823,8 +823,25 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     n_x1 = xL + 40.0
     n_x2 = xR - 40.0
     n_top = yXTop + 20.0
-    n_shape = pen.line([(n_x1, yBase), (n_x1, n_top), (n_x2, n_top), (n_x2, yBase)])
-    glyphs["n"] = (n_shape, W)
+
+    # Make the top-right a real shoulder curve (horizontal -> vertical),
+    # instead of a 90° corner that only gets rounded by join_style.
+    curve_dx = 170.0   # how long the shoulder runs horizontally before turning down
+    curve_dy = 160.0   # how far it drops while turning into the right stem
+    k = 0.62           # control strength (0.55–0.70 is a useful tuning range)
+
+    p0 = (n_x2 - curve_dx, n_top)          # start of the bend (end of the top bar)
+    p3 = (n_x2, n_top + curve_dy)          # end of the bend (start of the right stem)
+
+    # cubic with horizontal tangent at start and vertical tangent at end
+    c1 = (p0[0] + curve_dx * k, p0[1])
+    c2 = (p3[0], p3[1] - curve_dy * k)
+
+    shoulder = cubic_points(p0, c1, c2, p3, steps=90)
+
+    n_pts = [(n_x1, yBase), (n_x1, n_top), p0] + shoulder[1:] + [(n_x2, yBase)]
+    glyphs["n"] = (pen.line(n_pts), W)
+
 
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
