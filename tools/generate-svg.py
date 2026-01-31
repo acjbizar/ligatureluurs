@@ -535,39 +535,69 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
 
 
-    # 3 (top/bottom bars curve inward on the left WITHOUT S-curving back)
-    y3_top = yTop + ory * 0.10
-    y3_mid = yMid
-    y3_bot = yBase - ory * 0.10
+    # --- 3 ------------------------------------------------------------
+    # Requires in-scope: W, xL, xR, yTop, yBase, orx, ory, pen, glyphs
 
-    x3_left = xL + orx * 0.05
-    bulge3  = orx * 0.55
-    x3_join = xR - bulge3
+    # Consistent insets (keeps width/height aligned with other digits)
+    pad_x = orx * 0.12
+    pad_y = ory * 0.10
 
-    # Move the left endpoints toward the middle so the curve is one-directional
-    top_left_y = y3_top + ory * 0.10    # down toward middle
-    bot_left_y = y3_bot - ory * 0.10    # up toward middle
+    x3_left  = xL + pad_x
+    x3_right = xR - pad_x
 
-    def one_way_bar(yR: float, yL: float) -> Geom:
-        p0 = (x3_join, yR)
-        p3 = (x3_left, yL)
-        c1 = (x3_join - orx * 0.55, yR)      # keep right side steady
-        c2 = (x3_left + orx * 0.12, yL)      # shape happens near left
-        return pen.line(cubic_points(p0, c1, c2, p3, steps=90))
+    y3_top = yTop + pad_y
+    y3_bot = yBase - pad_y
+    y3_mid = (y3_top + y3_bot) / 2.0
 
-    three_top = one_way_bar(y3_top, top_left_y)
-    three_mid = pen.hline(x3_left + orx * 0.14, x3_join, y3_mid)
-    three_bot = one_way_bar(y3_bot, bot_left_y)
+    w3 = x3_right - x3_left
 
-    cy_u = (y3_top + y3_mid) / 2.0
-    ry_u = (y3_mid - y3_top) / 2.0
-    upper_loop = pen.line(ellipse_arc_points(x3_join, cy_u, bulge3, ry_u, 270.0, 90.0, clockwise=False, steps=220))
+    # Right-side bowls (two right-half ellipses), joined at the waist
+    # (unioned separately so a tangent mismatch at the waist won't create weird kinks)
+    r3 = w3 * 0.44                     # horizontal radius of bowls
+    cx3r = x3_right - r3               # bowl centers (so rightmost hits x3_right)
 
-    cy_l = (y3_mid + y3_bot) / 2.0
-    ry_l = (y3_bot - y3_mid) / 2.0
-    lower_loop = pen.line(ellipse_arc_points(x3_join, cy_l, bulge3, ry_l, 270.0, 90.0, clockwise=False, steps=220))
+    u_cy = (y3_top + y3_mid) / 2.0
+    u_ry = (y3_mid - y3_top) / 2.0
+    l_cy = (y3_mid + y3_bot) / 2.0
+    l_ry = (y3_bot - y3_mid) / 2.0
 
-    glyphs["3"] = (pen.union(three_top, three_mid, three_bot, upper_loop, lower_loop), W)
+    three_u = pen.line(ellipse_arc_points(cx3r, u_cy, r3, u_ry, 270.0, 90.0, clockwise=False, steps=240))
+    three_l = pen.line(ellipse_arc_points(cx3r, l_cy, r3, l_ry, 270.0, 90.0, clockwise=False, steps=240))
+    three_right = pen.union(three_u, three_l)
+
+    # Bars: from the bowl’s top/bottom point (x=cx3r) go straight left,
+    # then transition into a single smooth left terminal curve.
+    x3_kink = x3_left + (cx3r - x3_left) * 0.30   # where straight becomes curved
+    dy = (y3_mid - y3_top) * 0.42                 # amount of droop/rise at left
+    dxL = max(1.0, x3_kink - x3_left)
+
+    # Top bar: straight then left curve DOWN
+    top_arc = ellipse_arc_points(
+        cx=x3_kink, cy=y3_top + dy,
+        rx=dxL, ry=dy,
+        deg0=270.0, deg1=180.0,
+        clockwise=True,
+        steps=140
+    )
+    three_top = pen.line([(cx3r, y3_top), (x3_kink, y3_top)] + top_arc[1:])
+
+    # Bottom bar: straight then left curve UP
+    bot_arc = ellipse_arc_points(
+        cx=x3_kink, cy=y3_bot - dy,
+        rx=dxL, ry=dy,
+        deg0=90.0, deg1=180.0,
+        clockwise=False,
+        steps=140
+    )
+    three_bot = pen.line([(cx3r, y3_bot), (x3_kink, y3_bot)] + bot_arc[1:])
+
+    # Middle bar (kept shorter, like your style)
+    mid_x0 = x3_left + (cx3r - x3_left) * 0.40
+    mid_x1 = cx3r + r3 * 0.22
+    three_mid = pen.hline(mid_x0, mid_x1, y3_mid)
+
+    glyphs["3"] = (pen.union(three_right, three_top, three_mid, three_bot), W)
+    # ------------------------------------------------------------------
 
 
     # 4 (your approved construction: crossbar + stem + single diagonal to top of stem)
@@ -581,24 +611,31 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     four_diag = pen.line([(x4_left, y4_cross), (x4_stem, y4_top)])
     glyphs["4"] = (pen.union(four_stem, four_bar, four_diag), W)
 
-    # 5 (your “good” style: top + left + mid + bottom + right half-loop)
+    # 5 (top + left + higher mid + bottom + SMOOTHER bowl like cap A)
     y5_top = yTop + ory * 0.10
-    cap_h = (yBase - yTop)
-    y5_mid = yTop + cap_h * 0.44
+    y5_mid = yTop + (yBase - yTop) * 0.44   # your improved higher bar
     y5_bot = yBase - ory * 0.10
 
     x5_left = xL + orx * 0.02
-    bulge5 = orx * 0.60
-    x5_join = xR - bulge5
+
+    # bowl vertical geometry first
+    cy5 = (y5_mid + y5_bot) / 2.0
+    ry5 = (y5_bot - y5_mid) / 2.0
+
+    # Make the bowl closer to a circle (like the cap A arc):
+    # rx ~= ry  -> constant curvature feel
+    bulge5 = ry5 * 1.00          # try 0.95..1.10 to taste
+    x5_join = xR - bulge5        # keep rightmost at xR
 
     five_top  = pen.hline(x5_left, xR, y5_top)
     five_left = pen.vline(x5_left, y5_top, y5_mid)
     five_mid  = pen.hline(x5_left, x5_join, y5_mid)
     five_bot  = pen.hline(x5_left, x5_join, y5_bot)
 
-    cy5 = (y5_mid + y5_bot) / 2.0
-    ry5 = (y5_bot - y5_mid) / 2.0
-    five_loop = pen.line(ellipse_arc_points(x5_join, cy5, bulge5, ry5, 270.0, 90.0, clockwise=False, steps=240))
+    five_loop = pen.line(
+        ellipse_arc_points(x5_join, cy5, bulge5, ry5, 270.0, 90.0, clockwise=False, steps=260)
+    )
+
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
 
