@@ -583,7 +583,8 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     # 5 (your “good” style: top + left + mid + bottom + right half-loop)
     y5_top = yTop + ory * 0.10
-    y5_mid = yMid + ory * 0.05
+    cap_h = (yBase - yTop)
+    y5_mid = yTop + cap_h * 0.44
     y5_bot = yBase - ory * 0.10
 
     x5_left = xL + orx * 0.02
@@ -815,33 +816,52 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     e_pts = [bar_start, bar_end] + arc_pts[1:]
     glyphs["e"] = (pen.line(e_pts), W)
 
-    # f (stem + top hook as ONE smooth continuous stroke)
-    fx = cx - 65.0
+    # f: top is the top half of an oval connected smoothly to the stem
+    # (glyph made wider to fit the oval comfortably)
+    Wf = W + 50.0  # widen a bit; adjust if you want more/less
+    fx = 260.0     # keep same stem x as the SVG we agreed on
+
     f_top = yAsc + 10.0
     f_bot = yBase - 10.0
 
-    hook_rx = 150.0
-    hook_ry = 80.0
-    hook_cx = fx + hook_rx
-    hook_cy = f_top
+    # geometry from the agreed SVG (in this coordinate system)
+    y_oval_top = 50.0
+    y_join = 160.0
+    x_left = fx
+    x_right = 560.0
+    x_mid = (x_left + x_right) * 0.5
 
-    # End while still visually "up" (300–340 is a good range)
-    hook_end_deg = 330.0
+    # stem up to join point
+    pts: List[Tuple[float, float]] = [(fx, f_bot), (fx, y_join)]
 
-    hook_pts = ellipse_arc_points(
-        hook_cx, hook_cy, hook_rx, hook_ry,
-        180.0, hook_end_deg,
-        clockwise=False,   # <-- key change: makes it rise first in y-down coords
-        steps=160
-    )
-    hook_pts[0] = (fx, f_top)  # exact join
+    # Top half-oval as two cubic Beziers:
+    # leftmost -> top -> mid, then mid -> top -> rightmost
+    # These control points are tuned so the curve is "oval-like" and smooth.
+    # Segment 1: leftmost (x_left, y_join) to mid (x_mid, y_oval_top)
+    p0 = (x_left, y_join)
+    p3 = (x_mid, y_oval_top)
+    c1 = (x_left, y_oval_top + (y_join - y_oval_top) * 0.15)
+    c2 = (x_mid - (x_right - x_left) * 0.18, y_oval_top)
 
-    f_stem_hook = pen.line([(fx, f_bot), (fx, f_top)] + hook_pts[1:])
+    seg1 = cubic_points(p0, c1, c2, p3, steps=60)
 
-    f_cross_y = yXTop + 110.0
-    f_cross = pen.hline(fx, fx + 235.0, f_cross_y)
+    # Segment 2: mid (x_mid, y_oval_top) to rightmost (x_right, y_join)
+    p0 = p3
+    p3 = (x_right, y_join)
+    c1 = (x_mid + (x_right - x_left) * 0.18, y_oval_top)
+    c2 = (x_right, y_oval_top + (y_join - y_oval_top) * 0.15)
 
-    glyphs["f"] = (pen.union(f_stem_hook, f_cross), W)
+    seg2 = cubic_points(p0, c1, c2, p3, steps=60)
+
+    pts += seg1[1:] + seg2[1:]
+
+    f_stem_and_hook = pen.line(pts)
+
+    # crossbar (short, to the right)
+    f_cross_y = 435.0
+    f_cross = pen.hline(fx, 430.0, f_cross_y)
+
+    glyphs["f"] = (pen.union(f_stem_and_hook, f_cross), Wf)
 
 
     # g
