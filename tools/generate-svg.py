@@ -548,13 +548,12 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["2"] = (pen.line(two_pts), W)
 
 
-
     # --- 3 ------------------------------------------------------------
-    # Requires in-scope: W, xL, xR, yTop, yBase, orx, ory, pen, glyphs
+    # Left bends are a *scaled-down* copy of the right bowl curvature:
+    # equally round, just shorter.
 
-    # Consistent insets (keeps width/height aligned with other digits)
     pad_x = orx * 0.12
-    pad_y = ory * 0.10
+    pad_y = ory * 0.06  # keep it tall-ish like the other digits
 
     x3_left  = xL + pad_x
     x3_right = xR - pad_x
@@ -565,49 +564,52 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     w3 = x3_right - x3_left
 
-    # Right-side bowls (two right-half ellipses), joined at the waist
-    # (unioned separately so a tangent mismatch at the waist won't create weird kinks)
-    r3 = w3 * 0.44                     # horizontal radius of bowls
-    cx3r = x3_right - r3               # bowl centers (so rightmost hits x3_right)
+    # Right bowls
+    r3   = w3 * 0.46
+    cx3r = x3_right - r3
 
     u_cy = (y3_top + y3_mid) / 2.0
     u_ry = (y3_mid - y3_top) / 2.0
     l_cy = (y3_mid + y3_bot) / 2.0
     l_ry = (y3_bot - y3_mid) / 2.0
 
-    three_u = pen.line(ellipse_arc_points(cx3r, u_cy, r3, u_ry, 270.0, 90.0, clockwise=False, steps=240))
-    three_l = pen.line(ellipse_arc_points(cx3r, l_cy, r3, l_ry, 270.0, 90.0, clockwise=False, steps=240))
+    three_u = pen.line(ellipse_arc_points(cx3r, u_cy, r3, u_ry, 270.0, 90.0, clockwise=False, steps=260))
+    three_l = pen.line(ellipse_arc_points(cx3r, l_cy, r3, l_ry, 270.0, 90.0, clockwise=False, steps=260))
     three_right = pen.union(three_u, three_l)
 
-    # Bars: from the bowl’s top/bottom point (x=cx3r) go straight left,
-    # then transition into a single smooth left terminal curve.
-    x3_kink = x3_left + (cx3r - x3_left) * 0.30   # where straight becomes curved
-    dy = (y3_mid - y3_top) * 0.42                 # amount of droop/rise at left
-    dxL = max(1.0, x3_kink - x3_left)
+    # LEFT terminals: scaled-down curvature of the right bowls
+    s = 0.36  # <-- smaller = shorter bend (try 0.32..0.40)
+    rxL_top = r3 * s
+    ryL_top = u_ry * s
+    rxL_bot = r3 * s
+    ryL_bot = l_ry * s
 
-    # Top bar: straight then left curve DOWN
+    # The bar meets the arc at the arc's top point (angle 270 / 90), so no kink:
+    x_kink = x3_left + rxL_top
+
+    # Top: from bowl to left, then a quarter-ellipse down (same roundness as right)
     top_arc = ellipse_arc_points(
-        cx=x3_kink, cy=y3_top + dy,
-        rx=dxL, ry=dy,
+        cx=x_kink, cy=y3_top + ryL_top,
+        rx=rxL_top, ry=ryL_top,
         deg0=270.0, deg1=180.0,
         clockwise=True,
         steps=140
     )
-    three_top = pen.line([(cx3r, y3_top), (x3_kink, y3_top)] + top_arc[1:])
+    three_top = pen.line([(cx3r, y3_top), (x_kink, y3_top)] + top_arc[1:])
 
-    # Bottom bar: straight then left curve UP
+    # Bottom: from bowl to left, then a quarter-ellipse up (same roundness as right)
     bot_arc = ellipse_arc_points(
-        cx=x3_kink, cy=y3_bot - dy,
-        rx=dxL, ry=dy,
+        cx=x_kink, cy=y3_bot - ryL_bot,
+        rx=rxL_bot, ry=ryL_bot,
         deg0=90.0, deg1=180.0,
         clockwise=False,
         steps=140
     )
-    three_bot = pen.line([(cx3r, y3_bot), (x3_kink, y3_bot)] + bot_arc[1:])
+    three_bot = pen.line([(cx3r, y3_bot), (x_kink, y3_bot)] + bot_arc[1:])
 
-    # Middle bar (kept shorter, like your style)
-    mid_x0 = x3_left + (cx3r - x3_left) * 0.40
-    mid_x1 = cx3r + r3 * 0.22
+    # Middle bar (unchanged logic)
+    mid_x0 = x3_left + (cx3r - x3_left) * 0.42
+    mid_x1 = cx3r + r3 * 0.20
     three_mid = pen.hline(mid_x0, mid_x1, y3_mid)
 
     glyphs["3"] = (pen.union(three_right, three_top, three_mid, three_bot), W)
