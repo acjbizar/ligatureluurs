@@ -475,12 +475,26 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     # 0 (match cap O style, but optically inset)
     glyphs["0"] = (pen.ellipse_stroke(cx, yMid, orx, ory), W)
 
-    # 1 (widened with a flag + longer base so it doesn't look skinny)
-    one_x = cx + orx * 0.08
-    one_stem = pen.vline(one_x, yTop, yBase)
-    one_base = pen.hline(cx - orx * 0.45, cx + orx * 0.35, yBase)
-    one_flag = pen.line([(cx - orx * 0.28, yTop + ory * 0.22), (one_x, yTop)])
-    glyphs["1"] = (pen.union(one_stem, one_base, one_flag), W)
+    # 1 (top flag left only; base at least as wide as the flag)
+
+    pad_y = ory * 0.10
+    y1_top = yTop + pad_y
+    y1_bot = yBase - pad_y
+    x1 = cx
+
+    # Top flag (LEFT only) — no right overhang
+    flag_len = (xR - xL) * 0.28          # tweak 0.24..0.32
+    one_flag = pen.hline(x1 - flag_len, x1, y1_top)
+
+    # Stem
+    one_stem = pen.vline(x1, y1_top, y1_bot)
+
+    # Base: make it >= flag length, centered
+    base_half = max(flag_len, (xR - xL) * 0.18)  # ensure base >= top flag
+    one_base = pen.hline(x1 - base_half, x1 + base_half, y1_bot)
+
+    glyphs["1"] = (pen.union(one_flag, one_stem, one_base), W)
+
 
     # 2 (SVG-based shape, then stretch vertically so it matches digit height)
     cap_h = (yBase - yTop)
