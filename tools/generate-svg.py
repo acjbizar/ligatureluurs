@@ -639,45 +639,38 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
 
-    # 6 (match capital O height: outer top/bottom like cap O; shorter terminal)
-    yTop  = m.CAP_TOP
-    yBase = m.BASE
+    # 6 (bowl + left stem + top half-bowl arc that stops at rightmost point)
 
+    # Bowl geometry (keep consistent with your other round digits)
     six_rx = orx * 0.92
     six_ry = ory * 0.60
     six_cx = cx + 15.0
 
-    # IMPORTANT:
-    # Make the OUTER bottom match cap "O" outer bottom.
-    # cap O outer bottom is yBase + pen.r (because ellipse_stroke expands by pen.r).
-    # So we set bowl center so: cy + ry + pen.r == yBase + pen.r  -> cy = yBase - ry
-    six_cy = yBase - six_ry
+    # Put bowl low (round bottom sitting nicely; adjust if your other bowls use a different anchor)
+    # This places the ellipse center so the bottom of the STROKE sits on baseline.
+    six_cy = yBase - (six_ry + pen.r)
 
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
-    # Join at left-middle of bowl
-    join_x, join_y = (six_cx - six_rx, six_cy)
+    # Connect on LEFT-middle of the bowl
+    x_attach = six_cx - six_rx
+    y_attach = six_cy
 
-    # Terminal ellipse that connects at leftmost point (angle 180)
-    term_rx = six_rx * 1.16
-    term_cx = join_x + term_rx
-    term_cy = join_y
+    # Raise the top arc high enough to respect the glyph height.
+    # Use same rx/ry as bowl, but a higher centerline (cy_hook).
+    # The arc itself is the TOP HALF: 180 -> 0 (i.e. 180 -> 360)
+    y_arc = yTop + (yBase - yTop) * 0.27   # tweak 0.22..0.32 to taste
 
-    # IMPORTANT:
-    # Make the OUTER top match cap "O" outer top.
-    # cap O outer top is yTop - pen.r, and terminal outer top is term_cy - term_ry - pen.r
-    # Set equal -> term_ry = term_cy - yTop
-    term_ry = max(six_ry * 1.05, term_cy - yTop)
+    six_stem = pen.vline(x_attach, y_attach, y_arc)
 
-    # Terminal continues less long
-    TERMINAL_END_DEG = 302.0   # try 295..310
+    six_top_arc = pen.ellipse_arc(
+        six_cx, y_arc,
+        six_rx, six_ry,
+        180.0, 0.0,
+        steps=240
+    )
 
-    # Force the arc to include 270° apex so it truly reaches the top
-    pts1 = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry, 180.0, 270.0, clockwise=False, steps=140)
-    pts2 = ellipse_arc_points(term_cx, term_cy, term_rx, term_ry, 270.0, TERMINAL_END_DEG, clockwise=False, steps=140)[1:]
-    six_term = pen.line(pts1 + pts2)
-
-    glyphs["6"] = (pen.union(six_bowl, six_term), W)
+    glyphs["6"] = (pen.union(six_bowl, six_stem, six_top_arc), W)
 
 
     # 7 (top bar + diagonal, normalized)
