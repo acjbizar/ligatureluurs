@@ -378,8 +378,7 @@ def write_svg(out_path: Path, width: float, m: Metrics, g: Geom) -> None:
     d = geom_to_svg_path(g)
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'viewBox="0 0 {fmt(width)} {m.H}" '
-        f'width="{fmt(width)}" height="{m.H}">\n'
+        f'viewBox="0 0 {fmt(width)} {m.H}">\n'
         f'  <path d="{d}" fill="black" fill-rule="evenodd"/>\n'
         f'</svg>\n'
     )
