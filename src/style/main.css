@@ -1,0 +1,20 @@
+@font-face {
+  font-family: "Ligatureluurs";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+          url("https://hetcdn.nl/fonts/ligatureluurs.woff2") format("woff2"),
+          url("https://hetcdn.nl/fonts/ligatureluurs.woff") format("woff"),
+          url("https://hetcdn.nl/fonts/ligatureluurs.ttf") format("truetype");
+}
+
+:root {
+  --font--distribution: "Ligatureluurs", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.font--ligatureluurs {
+  font-family: var(--font--ligatureluurs);
+  font-weight: 400;
+  font-style: normal;
+}
