@@ -1,0 +1,36 @@
+{# templates/_character.svg.twig
+
+Usage:
+  {{ include('_character.svg.twig', { ch: 'A' }) }}
+  {{ include('_character.svg.twig', { character: '€', fallback: '<!-- missing -->' }) }}
+  {{ include('_character.svg.twig', { ch: 'A', strict: true }) }}
+
+Expects SVGs in: sketches/character-uXXXX.svg (lowercase hex)
+#}
+
+{% set ch = ch|default(character|default('')) %}
+{% set ch = ch ? ch|slice(0, 1) : '' %}
+
+{% set strict = strict|default(false) %}
+{% set fallback = fallback|default('') %}
+
+{% if ch == '' %}
+    {{ fallback|raw }}
+{% else %}
+    {# u filter returns a Symfony UnicodeString, which exposes codePointsAt() #}
+    {% set cp = (ch|u).codePointsAt(0)|first %}
+
+    {% if cp is empty %}
+        {{ fallback|raw }}
+    {% else %}
+        {% set hex = ('%04x'|format(cp))|lower %}
+        {% set name = '@sketches/character-u' ~ hex ~ '.svg' %}
+
+        {% if strict %}
+            {{ source(name)|raw }}
+        {% else %}
+            {% set svg = source(name, ignore_missing = true) %}
+            {{ (svg != '' ? svg : fallback)|raw }}
+        {% endif %}
+    {% endif %}
+{% endif %}

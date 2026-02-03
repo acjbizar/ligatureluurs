@@ -5,5 +5,8 @@
     "psr-4": {
       "Ligatureluurs\\": "src/"
     }
+  },
+  "require": {
+    "ext-mbstring": "*"
   }
 }
