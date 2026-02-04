@@ -10,7 +10,7 @@
 }
 
 :root {
-  --font--distribution: "Ligatureluurs", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font--ligatureluurs: "Ligatureluurs", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 .font--ligatureluurs {
