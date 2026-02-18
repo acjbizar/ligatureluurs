@@ -1,0 +1,79 @@
+{
+  "manifestVersion": 1,
+  "generatedAt": "2026-02-18T12:18:34.316425+00:00",
+  "name": "ligatureluurs",
+  "metadata": {
+    "family": "Ligatureluurs",
+    "subfamily": "Regular",
+    "fullName": "Ligatureluurs Regular",
+    "postScriptName": "Ligatureluurs-Regular",
+    "unitsPerEm": 1000,
+    "glyphCount": 64
+  },
+  "files": [
+    {
+      "ext": "woff2",
+      "file": "ligatureluurs.woff2",
+      "recommendedFile": "ligatureluurs.woff2",
+      "bytes": 30940,
+      "sha256": "aafb6ff0c54bc883b416e0791093b37cebe77a1fa040dbea7433c29b514a321a"
+    },
+    {
+      "ext": "woff",
+      "file": "ligatureluurs.woff",
+      "recommendedFile": "ligatureluurs.woff",
+      "bytes": 35372,
+      "sha256": "287df7d1d7fd0f28872aa8afb81e13d046db84f32e5bdd45ec7ce651dacd33f9"
+    },
+    {
+      "ext": "ttf",
+      "file": "ligatureluurs.ttf",
+      "recommendedFile": "ligatureluurs.ttf",
+      "bytes": 86744,
+      "sha256": "aeda270dadb5c08acd443efd9720ce81284572ebf7e346c91c078e5c9fb3f927"
+    }
+  ],
+  "unicodeRanges": [
+    [
+      32,
+      32
+    ],
+    [
+      48,
+      57
+    ],
+    [
+      65,
+      90
+    ],
+    [
+      97,
+      122
+    ]
+  ],
+  "counts": {
+    "codepointsTotal": 63,
+    "codepointsBMP": 63,
+    "codepointsAstral": 0
+  },
+  "features": {
+    "GSUB": [],
+    "GPOS": []
+  },
+  "hints": {
+    "commonBlocks": {
+      "basicLatin": true,
+      "latin1Supplement": false,
+      "latinExtendedA": false,
+      "latinExtendedB": false
+    },
+    "preferredLowercaseFilenames": true,
+    "hasCasingMismatches": false,
+    "notes": [
+      "unicodeRanges is derived from cmap.getBestCmap() across all parseable font files.",
+      "GSUB/GPOS feature tags are extracted when those tables exist.",
+      "Ligature contents are not enumerated here (by design); use shaping in your sample to demonstrate them.",
+      "If files[].file differs from files[].recommendedFile, consider renaming to the recommended lowercase filenames for portability (CDN/Linux)."
+    ]
+  }
+}
