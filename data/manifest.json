@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-02-18T12:18:34.316425+00:00",
+  "generatedAt": "2026-03-15T11:40:14.631415+00:00",
   "name": "ligatureluurs",
   "metadata": {
     "family": "Ligatureluurs",
@@ -8,52 +8,76 @@
     "fullName": "Ligatureluurs Regular",
     "postScriptName": "Ligatureluurs-Regular",
     "unitsPerEm": 1000,
-    "glyphCount": 64
+    "glyphCount": 87
   },
   "files": [
     {
       "ext": "woff2",
       "file": "ligatureluurs.woff2",
       "recommendedFile": "ligatureluurs.woff2",
-      "bytes": 30940,
-      "sha256": "aafb6ff0c54bc883b416e0791093b37cebe77a1fa040dbea7433c29b514a321a"
+      "bytes": 17220,
+      "sha256": "a3eebf235f68a5b6940662038962450b7dfcc5aeb7489e993988145412e25ac5"
     },
     {
       "ext": "woff",
       "file": "ligatureluurs.woff",
       "recommendedFile": "ligatureluurs.woff",
-      "bytes": 35372,
-      "sha256": "287df7d1d7fd0f28872aa8afb81e13d046db84f32e5bdd45ec7ce651dacd33f9"
+      "bytes": 21000,
+      "sha256": "dae4d1343b782681aa52940a0384c0ad9b3237e28930fcc8d0fa5dac69a2a477"
     },
     {
       "ext": "ttf",
       "file": "ligatureluurs.ttf",
       "recommendedFile": "ligatureluurs.ttf",
-      "bytes": 86744,
-      "sha256": "aeda270dadb5c08acd443efd9720ce81284572ebf7e346c91c078e5c9fb3f927"
+      "bytes": 136276,
+      "sha256": "b43ba2c13a22336fef61fb1170ed1b0e23769560a093b98c348b12167baf9068"
     }
   ],
   "unicodeRanges": [
     [
       32,
-      32
+      34
     ],
     [
-      48,
-      57
+      39,
+      41
+    ],
+    [
+      44,
+      59
+    ],
+    [
+      63,
+      63
     ],
     [
       65,
-      90
+      93
     ],
     [
       97,
       122
+    ],
+    [
+      8211,
+      8212
+    ],
+    [
+      8216,
+      8217
+    ],
+    [
+      8220,
+      8221
+    ],
+    [
+      8230,
+      8230
     ]
   ],
   "counts": {
-    "codepointsTotal": 63,
-    "codepointsBMP": 63,
+    "codepointsTotal": 85,
+    "codepointsBMP": 85,
     "codepointsAstral": 0
   },
   "features": {
