@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-03-15T14:42:25.824569+00:00",
+  "generatedAt": "2026-03-15T21:09:09.412151+00:00",
   "name": "ligatureluurs",
   "metadata": {
     "family": "Ligatureluurs",
@@ -15,22 +15,22 @@
       "ext": "woff2",
       "file": "ligatureluurs.woff2",
       "recommendedFile": "ligatureluurs.woff2",
-      "bytes": 17672,
-      "sha256": "f585903dc6bce87ec4c78e92d9fe61c78c06f12a150c21678b9e8394a223469a"
+      "bytes": 17724,
+      "sha256": "f9e2f3ee4cb1455492c0b346001b367703ae7fb001270035abb9b6132b053c4d"
     },
     {
       "ext": "woff",
       "file": "ligatureluurs.woff",
       "recommendedFile": "ligatureluurs.woff",
-      "bytes": 21336,
-      "sha256": "652b9931cd92350dcf72b97114fb061369d3d3553814ce5c0146d11b83e860a6"
+      "bytes": 21260,
+      "sha256": "c125b21281d9cf62c64f7a41335b176e32f6fe40a217f45cf25b98f630ffeb2a"
     },
     {
       "ext": "ttf",
       "file": "ligatureluurs.ttf",
       "recommendedFile": "ligatureluurs.ttf",
-      "bytes": 136184,
-      "sha256": "4b1350deacfb1009ee72521c8abc3a7eccd033a2a0300ccc45d23ed1f6c5706d"
+      "bytes": 136308,
+      "sha256": "176f76770b0502a2cd33a781e42ae6464595fbde28ebb63b175767cc692a16f2"
     }
   ],
   "unicodeRanges": [

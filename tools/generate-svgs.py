@@ -824,18 +824,18 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["2"] = (pen.line(two_pts), W)
 
     # 3 ----------------------------------------------------------------
-    pad_x3 = orx * 0.10
-    pad_y3 = ory * 0.02
+    pad_x3 = orx * 0.085
+    pad_y3 = ory * 0.015
 
     x3_left = xL + pad_x3
-    x3_right = xR - pad_x3 * 0.70
+    x3_right = xR - pad_x3 * 0.45
 
     y3_top = yD_top + pad_y3
     y3_bot = yD_bot
     y3_mid = (y3_top + y3_bot) / 2.0
 
     w3 = x3_right - x3_left
-    r3 = w3 * 0.44
+    r3 = w3 * 0.455
     cx3r = x3_right - r3
 
     u_cy = (y3_top + y3_mid) / 2.0
@@ -851,9 +851,9 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     three_right = pen.union(three_u, three_l)
 
-    LEFT_SCALE = 0.72
-    TOP_END_DEG = 208.0
-    BOT_END_DEG = 152.0
+    LEFT_SCALE = 0.74
+    TOP_END_DEG = 205.0
+    BOT_END_DEG = 155.0
 
     rxL_top = r3 * LEFT_SCALE
     ryL_top = u_ry * LEFT_SCALE
@@ -886,17 +886,17 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     three_bot = pen.line([(cx3r, y3_bot), (x_kink, y3_bot)] + bot_arc[1:])
 
-    mid_x0 = x3_left + (cx3r - x3_left) * 0.40
-    mid_x1 = cx3r + r3 * 0.16
+    mid_x0 = x3_left + (cx3r - x3_left) * 0.36
+    mid_x1 = cx3r + r3 * 0.18
     three_mid = pen.hline(mid_x0, mid_x1, y3_mid)
 
     glyphs["3"] = (pen.union(three_right, three_top, three_mid, three_bot), W)
 
     # 4 ----------------------------------------------------------------
-    x4_stem = xR - orx * 0.02
-    y4_top = yD_top
-    y4_cross = yD_mid + hD * 0.03
-    x4_left = xL + orx * 0.04
+    x4_stem = xR - orx * 0.08
+    y4_top = yD_top + ory * 0.015
+    y4_cross = yD_mid + hD * 0.035
+    x4_left = xL + orx * 0.08
 
     four_stem = pen.vline(x4_stem, y4_top, yD_bot)
     four_bar = pen.hline(x4_left, x4_stem, y4_cross)
