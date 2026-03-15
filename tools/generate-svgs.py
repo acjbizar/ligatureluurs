@@ -772,8 +772,8 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     one_base = pen.hline(x1 - base_half, x1 + base_half, y1_bot)
     glyphs["1"] = (pen.union(one_flag, one_stem, one_base), W)
 
-    # 2 ----------------------------------------------------------------
-    TWO_WIDEN = 0.14
+# 2 ----------------------------------------------------------------
+    TWO_WIDEN = 0.20
     pad2 = wD * TWO_WIDEN
 
     xL2 = max(pen.r + 2.0, xD_left - pad2)
@@ -785,28 +785,28 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     def Y(t: float) -> float:
         return yD_top + hD * t
 
-    p0  = (X(190 / 700), Y((260 - 40) / 740))
-    c01 = (X(240 / 700), Y((150 - 40) / 740))
-    c02 = (X(420 / 700), Y((130 - 40) / 740))
-    p1  = (X(500 / 700), Y((220 - 40) / 740))
+    p0  = (X(175 / 700), Y((245 - 40) / 740))
+    c01 = (X(235 / 700), Y((135 - 40) / 740))
+    c02 = (X(430 / 700), Y((120 - 40) / 740))
+    p1  = (X(515 / 700), Y((210 - 40) / 740))
 
-    c11 = (X(560 / 700), Y((290 - 40) / 740))
-    c12 = (X(520 / 700), Y((390 - 40) / 740))
-    p2  = (X(420 / 700), Y((460 - 40) / 740))
+    c11 = (X(575 / 700), Y((280 - 40) / 740))
+    c12 = (X(535 / 700), Y((385 - 40) / 740))
+    p2  = (X(435 / 700), Y((455 - 40) / 740))
 
-    c21 = (X(350 / 700), Y((510 - 40) / 740))
-    c22 = (X(300 / 700), Y((540 - 40) / 740))
-    p3  = (X(250 / 700), Y((610 - 40) / 740))
+    c21 = (X(355 / 700), Y((510 - 40) / 740))
+    c22 = (X(295 / 700), Y((540 - 40) / 740))
+    p3  = (X(235 / 700), Y((600 - 40) / 740))
 
-    p4  = (X(150 / 700), yD_bot)
-    p5  = (X(530 / 700), yD_bot)
+    p4  = (X(120 / 700), yD_bot)
+    p5  = (X(560 / 700), yD_bot)
 
     shape_pts = [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
     y_min = min(y for _, y in shape_pts)
-    target_top = yD_top + pen.r * 0.18
+    target_top = yD_top + pen.r * 0.04
 
     s = (yD_bot - target_top) / (yD_bot - y_min)
-    s = max(1.0, min(s, 1.42))
+    s = max(1.0, min(s, 1.48))
 
     def SY(pt):
         x, y = pt
@@ -929,9 +929,9 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
     # 6 ----------------------------------------------------------------
-    six_rx = orx * 0.98
-    six_ry = hR * 0.34
-    six_cx = cx + orx * 0.08
+    six_rx = wD * 0.48
+    six_ry = hR * 0.285
+    six_cx = cx + wD * 0.035
     six_cy = yR_bot - six_ry
 
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
@@ -939,11 +939,10 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     x_attach = six_cx - six_rx
     y_attach = six_cy
 
-    # Make the top arc align optically with the rounded overshoot top.
     y_arc = yR_top + six_ry
     six_stem = pen.vline(x_attach, y_arc, y_attach)
 
-    ARC_END_DEG = 328.0
+    ARC_END_DEG = 325.0
     six_top_arc = pen.ellipse_arc(
         six_cx, y_arc, six_rx, six_ry, 180.0, ARC_END_DEG, steps=240
     )
