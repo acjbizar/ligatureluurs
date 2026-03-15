@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import html as html_lib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -127,8 +128,8 @@ def cubic_points(
     for i in range(steps):
         t = i / (steps - 1)
         mt = 1.0 - t
-        x = (mt**3)*x0 + 3*(mt**2)*t*x1 + 3*mt*(t**2)*x2 + (t**3)*x3
-        y = (mt**3)*y0 + 3*(mt**2)*t*y1 + 3*mt*(t**2)*y2 + (t**3)*y3
+        x = (mt**3) * x0 + 3 * (mt**2) * t * x1 + 3 * mt * (t**2) * x2 + (t**3) * x3
+        y = (mt**3) * y0 + 3 * (mt**2) * t * y1 + 3 * mt * (t**2) * y2 + (t**3) * y3
         pts.append((x, y))
     return pts
 
@@ -172,7 +173,6 @@ def clamp(v: float, lo: float, hi: float) -> float:
 
 
 def safe_round_rx(W: float, pen_r: float, rx: float, safe_margin: float) -> float:
-    # keep ellipse from kissing the viewbox edge (stroke included)
     return min(rx, (W / 2.0) - pen_r - safe_margin)
 
 
@@ -184,7 +184,6 @@ def corner_h_to_v(
     k: float = T.K,
     steps: int = T.CURVE_STEPS
 ) -> List[Tuple[float, float]]:
-    # start tangent: horizontal; end tangent: vertical (down)
     x0, y0 = p0
     p3 = (x0 + dx, y0 + dy)
     c1 = (x0 + dx * k, y0)
@@ -199,7 +198,6 @@ def corner_v_to_h(
     k: float = T.K,
     steps: int = T.CURVE_STEPS
 ) -> List[Tuple[float, float]]:
-    # start tangent: vertical (down); end tangent: horizontal (right)
     x0, y0 = p0
     p3 = (x0 + dx, y0 + dy)
     c1 = (x0, y0 + dy * k)
@@ -342,9 +340,25 @@ def fmt(x: float) -> str:
 
 
 def codepoint_filename(s: str) -> str:
-    cps = [f"u{ord(ch):04x}" for ch in s]  # lowercase u + lowercase hex
+    cps = [f"u{ord(ch):04x}" for ch in s]
     code = "_".join(cps)
     return f"character-{code}.svg"
+
+
+def preview_label(ch: str) -> str:
+    return {
+        " ": "SPACE",
+        "\"": "QUOTATION MARK",
+        "'": "APOSTROPHE",
+        "\\": "BACKSLASH",
+        "‘": "LEFT SINGLE QUOTATION MARK",
+        "’": "RIGHT SINGLE QUOTATION MARK",
+        "“": "LEFT DOUBLE QUOTATION MARK",
+        "”": "RIGHT DOUBLE QUOTATION MARK",
+        "…": "ELLIPSIS",
+        "–": "EN DASH",
+        "—": "EM DASH",
+    }.get(ch, ch)
 
 
 def geom_to_svg_path(g: Geom) -> str:
@@ -385,15 +399,20 @@ def write_svg(out_path: Path, width: float, m: Metrics, g: Geom) -> None:
 def write_preview_html(out_dir: Path, items: List[Tuple[str, str]]) -> None:
     cells = []
     for label, fname in sorted(items, key=lambda t: t[1]):
+        label_text = html_lib.escape(label)
+        file_text = html_lib.escape(fname)
+        src_attr = html_lib.escape(fname, quote=True)
+        alt_attr = html_lib.escape(label, quote=True)
+
         cells.append(f"""
 <div class="cell">
-  <div class="label">{label}</div>
-  <div class="file">{fname}</div>
-  <img src="{fname}" alt="{label}">
+  <div class="label">{label_text}</div>
+  <div class="file">{file_text}</div>
+  <img src="{src_attr}" alt="{alt_attr}">
 </div>
 """.strip())
 
-    html = f"""<!doctype html>
+    html_doc = f"""<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
@@ -415,7 +434,7 @@ img{{width:100%;height:auto;display:block;background:#fff;border-radius:8px}}
 </body>
 </html>
 """
-    (out_dir / "preview.html").write_text(html, encoding="utf-8")
+    (out_dir / "preview.html").write_text(html_doc, encoding="utf-8")
 
 
 # ----------------------------
@@ -521,13 +540,12 @@ def make_lc_frame(m: Metrics) -> LCFrame:
     return LCFrame(W, xL, xR, cx, yBase, yXTop, yMid, yAsc, yDesc, bowl_rx, bowl_ry, bowl_cx, bowl_cy)
 
 
-# Shared bowl builder (used by b/d/p/q)
 def stem_bowl(
     pen: Mono,
     stem_x: float,
     top_y: float,
     bot_y: float,
-    side: str,        # "right" or "left"
+    side: str,
     stem_top: float,
     stem_bot: float,
     bowl_rx: float,
@@ -613,7 +631,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(xL, xR - 70, yMid),
     ), W)
 
-    # G
     g_a0 = 300.0
     g_a1 = 60.0
     G_RX = ROUND_RX
@@ -671,9 +688,11 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(xL, yMid), (xR, yBase)]),
     ), W)
 
-    glyphs["L"] = (pen.union(pen.vline(xL, yTop, yBase), pen.hline(xL, xR, yBase)), W)
+    glyphs["L"] = (pen.union(
+        pen.vline(xL, yTop, yBase),
+        pen.hline(xL, xR, yBase)
+    ), W)
 
-    # M (wider)
     MW_W = W + 120.0
     mxL = T.CAP_INSET
     mxR = MW_W - T.CAP_INSET
@@ -706,9 +725,11 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     ])
     glyphs["Q"] = (pen.union(O, q_tail), W)
 
-    glyphs["R"] = (pen.union(glyphs["P"][0], pen.line([(xFlat, yMid), (xR, yBase)])), W)
+    glyphs["R"] = (pen.union(
+        glyphs["P"][0],
+        pen.line([(xFlat, yMid), (xR, yBase)])
+    ), W)
 
-    # S (new rounded construction)
     S_xL = xL + 12.0
     S_xR = xR - 12.0
     S_y0 = yTop + 8.0
@@ -716,7 +737,10 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     S_pts = s_from_spec(S_CAP_SPEC, S_xL, S_xR, S_y0, S_y3, steps=84)
     glyphs["S"] = (pen.line(S_pts), W)
 
-    glyphs["T"] = (pen.union(pen.hline(xL, xR, yTop), pen.vline(cx, yTop, yBase)), W)
+    glyphs["T"] = (pen.union(
+        pen.hline(xL, xR, yTop),
+        pen.vline(cx, yTop, yBase)
+    ), W)
 
     u_end = 560.0
     glyphs["U"] = (pen.union(
@@ -727,7 +751,6 @@ def build_uppercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["V"] = (pen.line([(xL, yTop), (cx, yBase), (xR, yTop)]), W)
 
-    # W (wider)
     WW_W = W + 120.0
     wxL = T.CAP_INSET
     wxR = WW_W - T.CAP_INSET
@@ -779,7 +802,6 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["0"] = (pen.ellipse_stroke(cx, yMid, orx, ory), W)
 
-    # 1
     pad_y = ory * 0.10
     y1_top = yTop + pad_y
     y1_bot = yBase - pad_y
@@ -793,7 +815,6 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     one_base = pen.hline(x1 - base_half, x1 + base_half, y1_bot)
     glyphs["1"] = (pen.union(one_flag, one_stem, one_base), W)
 
-    # 2
     cap_h = (yBase - yTop)
     TWO_WIDEN = 0.22
 
@@ -809,21 +830,21 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     def Y(t: float) -> float:
         return yTop + cap_h * t
 
-    p0  = (X(190/700), Y((260-40)/740))
-    c01 = (X(240/700), Y((150-40)/740))
-    c02 = (X(420/700), Y((130-40)/740))
-    p1  = (X(500/700), Y((220-40)/740))
+    p0  = (X(190 / 700), Y((260 - 40) / 740))
+    c01 = (X(240 / 700), Y((150 - 40) / 740))
+    c02 = (X(420 / 700), Y((130 - 40) / 740))
+    p1  = (X(500 / 700), Y((220 - 40) / 740))
 
-    c11 = (X(560/700), Y((290-40)/740))
-    c12 = (X(520/700), Y((390-40)/740))
-    p2  = (X(420/700), Y((460-40)/740))
+    c11 = (X(560 / 700), Y((290 - 40) / 740))
+    c12 = (X(520 / 700), Y((390 - 40) / 740))
+    p2  = (X(420 / 700), Y((460 - 40) / 740))
 
-    c21 = (X(350/700), Y((510-40)/740))
-    c22 = (X(300/700), Y((540-40)/740))
-    p3  = (X(260/700), Y((610-40)/740))
+    c21 = (X(350 / 700), Y((510 - 40) / 740))
+    c22 = (X(300 / 700), Y((540 - 40) / 740))
+    p3  = (X(260 / 700), Y((610 - 40) / 740))
 
-    p4  = (X(170/700), yBase)
-    p5  = (X(520/700), yBase)
+    p4  = (X(170 / 700), yBase)
+    p5  = (X(520 / 700), yBase)
 
     shape_pts = [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
     y_min = min(y for _, y in shape_pts)
@@ -836,7 +857,9 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         x, y = pt
         return (x, yBase - (yBase - y) * s)
 
-    p0, c01, c02, p1, c11, c12, p2, c21, c22, p3 = map(SY, [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3])
+    p0, c01, c02, p1, c11, c12, p2, c21, c22, p3 = map(
+        SY, [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
+    )
 
     seg0 = cubic_points(p0, c01, c02, p1, steps=90)
     seg1 = cubic_points(p1, c11, c12, p2, steps=90)[1:]
@@ -845,11 +868,10 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     two_pts = seg0 + seg1 + seg2 + [p4, p5]
     glyphs["2"] = (pen.line(two_pts), W)
 
-    # 3
     pad_x = orx * 0.12
     pad_y = ory * 0.06
 
-    x3_left  = xL + pad_x
+    x3_left = xL + pad_x
     x3_right = xR - pad_x
 
     y3_top = yTop + pad_y
@@ -857,7 +879,7 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     y3_mid = (y3_top + y3_bot) / 2.0
 
     w3 = x3_right - x3_left
-    r3   = w3 * 0.46
+    r3 = w3 * 0.46
     cx3r = x3_right - r3
 
     u_cy = (y3_top + y3_mid) / 2.0
@@ -904,18 +926,16 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["3"] = (pen.union(three_right, three_top, three_mid, three_bot), W)
 
-    # 4
     x4_stem = xR
     y4_top = yTop
     y4_cross = yMid + ory * 0.05
     x4_left = xL
 
     four_stem = pen.vline(x4_stem, y4_top, yBase)
-    four_bar  = pen.hline(x4_left, x4_stem, y4_cross)
+    four_bar = pen.hline(x4_left, x4_stem, y4_cross)
     four_diag = pen.line([(x4_left, y4_cross), (x4_stem, y4_top)])
     glyphs["4"] = (pen.union(four_stem, four_bar, four_diag), W)
 
-    # 5
     y5_top = yTop + ory * 0.10
     y5_mid = yTop + (yBase - yTop) * 0.44
     y5_bot = yBase - ory * 0.10
@@ -928,10 +948,10 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     bulge5 = ry5 * 1.00
     x5_join = xR - bulge5
 
-    five_top  = pen.hline(x5_left, xR, y5_top)
+    five_top = pen.hline(x5_left, xR, y5_top)
     five_left = pen.vline(x5_left, y5_top, y5_mid)
-    five_mid  = pen.hline(x5_left, x5_join, y5_mid)
-    five_bot  = pen.hline(x5_left, x5_join, y5_bot)
+    five_mid = pen.hline(x5_left, x5_join, y5_mid)
+    five_bot = pen.hline(x5_left, x5_join, y5_bot)
 
     five_loop = pen.line(
         ellipse_arc_points(x5_join, cy5, bulge5, ry5, 270.0, 90.0, clockwise=False, steps=260)
@@ -939,7 +959,6 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    # 6
     six_rx = orx * 0.92
     six_ry = ory * 0.60
     six_cx = cx + 15.0
@@ -958,12 +977,10 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["6"] = (pen.union(six_bowl, six_stem, six_top_arc), W)
 
-    # 7
     seven_top = pen.hline(xL, xR, yTop + ory * 0.08)
     seven_diag = pen.line([(xR, yTop + ory * 0.08), (xL + orx * 0.18, yBase)])
     glyphs["7"] = (pen.union(seven_top, seven_diag), W)
 
-    # 8
     rx8_top, ry8_top = orx * 0.94, ory * 0.40
     rx8_bot, ry8_bot = orx * 1.02, ory * 0.46
 
@@ -979,7 +996,6 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["8"] = (eight, W)
 
-    # 9
     g6, _ = glyphs["6"]
     origin = (W / 2.0, (m.CAP_TOP + m.BASE) / 2.0)
     g9 = affinity.rotate(g6, 180.0, origin=origin)
@@ -1009,16 +1025,15 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["c"] = (pen.ellipse_arc(bcX, bcY, rx, ry, 45.0, 315.0, steps=240), W)
 
-    # a
-    a_p0  = (146.0, 400.0)
+    a_p0 = (146.0, 400.0)
 
     a_c01 = (205.0, 320.0)
     a_c02 = (265.0, 310.0)
-    a_p1  = (312.0, 315.0)
+    a_p1 = (312.0, 315.0)
 
     a_c11 = (345.0, 318.0)
     a_c12 = (360.0, 335.0)
-    a_p2  = (360.0, 360.0)
+    a_p2 = (360.0, 360.0)
 
     seg0 = cubic_points(a_p0, a_c01, a_c02, a_p1, steps=50)
     seg1 = cubic_points(a_p1, a_c11, a_c12, a_p2, steps=30)
@@ -1026,11 +1041,11 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     stem_down = [(360.0, 770.0)]
     bottom_in = [(256.0, 770.0)]
 
-    a_p3  = (146.0, 665.0)
+    a_p3 = (146.0, 665.0)
     a_c21 = (195.25, 770.0)
     a_c22 = (146.0, 723.0)
 
-    a_p4  = (256.0, 560.0)
+    a_p4 = (256.0, 560.0)
     a_c31 = (146.0, 607.0)
     a_c32 = (195.25, 560.0)
 
@@ -1050,7 +1065,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["a"] = (pen.line(a_pts), W)
 
-    # b/d/p/q
     b_stem_x = xL + T.STEM_INSET
     b_top = yXTop + 15.0
     b_bot = yBase - 10.0
@@ -1071,7 +1085,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=d_rx, overlap=10.0,
     ), W)
 
-    # e
     e_cx, e_cy = bcX, bcY
     e_rx, e_ry = rx, ry
     e_bar_y = yXTop + 180.0
@@ -1094,7 +1107,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     e_pts = [bar_start, bar_end] + arc_pts[1:]
     glyphs["e"] = (pen.line(e_pts), W)
 
-    # f
     Wf = W + 50.0
     fx = 260.0
 
@@ -1128,7 +1140,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["f"] = (pen.union(f_stem_and_hook, f_cross), Wf)
 
-    # g
     g_cx, g_cy = bcX - 20.0, bcY - 10.0
     g_rx, g_ry = rx * 0.88, ry * 0.88
     g_bowl = pen.ellipse_stroke(g_cx, g_cy, g_rx, g_ry)
@@ -1139,7 +1150,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     g_hook = pen.arc(g_stem_x - 120.0, g_stem_y1, 120.0, 0.0, 180.0, steps=180)
     glyphs["g"] = (pen.union(g_bowl, g_stem, g_hook), W)
 
-    # h
     hxL = xL + T.STEM_INSET
     hxR = xR - T.STEM_INSET
     h_top_y = yXTop + 20.0
@@ -1163,12 +1173,10 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["h"] = (pen.union(h_left, h_shoulder), W)
 
-    # i/j
     ix = cx
     glyphs["i"] = (pen.union(pen.vline(ix, yXTop + 20.0, yBase), pen.dot(ix, dot_y, dot_r)), W)
     glyphs["j"] = (pen.union(pen.vline(ix, yXTop + 20.0, yDesc - 10.0), pen.dot(ix, dot_y, dot_r)), W)
 
-    # k
     kx = xL + T.STEM_INSET
     ky_mid = (yXTop + yBase) / 2.0
     glyphs["k"] = (pen.union(
@@ -1177,10 +1185,8 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(kx, ky_mid), (xR - 10.0, yBase - 20.0)]),
     ), W)
 
-    # l
     glyphs["l"] = (pen.vline(cx - 120.0, yAsc, yBase), W)
 
-    # m
     n_aperture = (xR - T.STEM_INSET) - (xL + T.STEM_INSET)
 
     Wm = W + n_aperture
@@ -1208,7 +1214,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["m"] = (pen.line(m_pts), Wm)
 
-    # n
     n_x1 = xL + T.STEM_INSET
     n_x2 = xR - T.STEM_INSET
     n_top = yXTop + 20.0
@@ -1222,7 +1227,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     n_pts = [(n_x1, yBase), (n_x1, n_top), p0] + shoulder[1:] + [(n_x2, yBase)]
     glyphs["n"] = (pen.line(n_pts), W)
 
-    # o
     glyphs["o"] = (pen.ellipse_stroke(bcX, bcY, rx, ry), W)
 
     desc_len = (yXTop - yAsc)
@@ -1248,7 +1252,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=q_rx, overlap=10.0,
     ), W)
 
-    # r
     rx_stem = xL + T.STEM_INSET
     r_stem_top = yXTop + 20.0
     r_start_y = r_stem_top + 120.0
@@ -1263,7 +1266,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     r_pts = [(rx_stem, yBase), (rx_stem, r_stem_top), p0] + cubic_points(p0, c1, c2, p3, steps=90)[1:]
     glyphs["r"] = (pen.line(r_pts), W)
 
-    # s (new rounded construction)
     s_xL = xL + 18.0
     s_xR = xR - 18.0
     s_y0 = yXTop + 10.0
@@ -1271,12 +1273,11 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     s_pts = s_from_spec(S_LC_SPEC, s_xL, s_xR, s_y0, s_y3, steps=84)
     glyphs["s"] = (pen.line(s_pts), W)
 
-    # t
     tx = cx + 85.0
     t_top = yAsc + 10.0
     t_bot = yBase - 10.0
     t_cross_y = yXTop + 60.0
-    t_left  = tx
+    t_left = tx
     t_right = tx + 220.0
 
     glyphs["t"] = (pen.union(
@@ -1284,7 +1285,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.hline(t_left, t_right, t_cross_y),
     ), W)
 
-    # u
     ux1 = xL + 50.0
     ux2 = xR - 50.0
     u_top = yXTop + 20.0
@@ -1305,10 +1305,8 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     u_pts += [(ux2, u_bot), (ux2, u_top)]
     glyphs["u"] = (pen.line(u_pts), W)
 
-    # v
     glyphs["v"] = (pen.line([(xL + 60.0, yXTop + 20.0), (cx, yBase), (xR - 60.0, yXTop + 20.0)]), W)
 
-    # w
     Ww = W + n_aperture
     xLw, xRw = T.LC_INSET, Ww - T.LC_INSET
 
@@ -1337,7 +1335,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["w"] = (pen.union(w_outer, w_mid), Ww)
 
-    # x
     x1 = xL + 55.0
     x2 = xR - 55.0
     x_top = yXTop + 30.0
@@ -1347,7 +1344,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         pen.line([(x2, x_top), (x1, x_bot)])
     ), W)
 
-    # y
     yx1 = xL + 50.0
     yx2 = xR - 50.0
     y_top = yXTop + 20.0
@@ -1374,7 +1370,6 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["y"] = (pen.union(left_and_bar, right_stem), W)
 
-    # z
     z_top = yXTop + 30.0
     z_bot = yBase - 10.0
     glyphs["z"] = (pen.union(
@@ -1385,6 +1380,203 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     for ch in "abcdefghijklmnopqrstuvwxyz":
         glyphs.setdefault(ch, (Polygon(), W))
+
+    return glyphs
+
+
+# ----------------------------
+# Punctuation
+# ----------------------------
+
+def build_punctuation(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
+    glyphs: Dict[str, Tuple[Geom, float]] = {}
+
+    yTop = m.CAP_TOP
+    yBase = m.BASE
+    yCapMid = m.CAP_MID
+    yXTop = m.X_TOP
+    yXMid = m.X_MID
+
+    dot_r = pen.r * 0.92
+
+    period_y = yBase - dot_r
+    upper_dot_y = yXTop + 135.0
+
+    W_SPACE = 320.0
+    W_DOT = 260.0
+    W_EXCL = 260.0
+    W_APOS = 220.0
+    W_QUOTE = 340.0
+    W_DASH = 360.0
+    W_EN_DASH = 500.0
+    W_EM_DASH = 780.0
+    W_SLASH = 420.0
+    W_BRACKET = 300.0
+    W_PAREN = 320.0
+    W_QUEST = 520.0
+    W_ELLIPSIS = 520.0
+    W_CURLY_SINGLE = 230.0
+    W_CURLY_DOUBLE = 360.0
+
+    def right_single_curly_quote(cx: float, y0: float) -> Geom:
+        pts = cubic_chain_points(
+            (cx + 12.0, y0 + 48.0),
+            [
+                ((cx + 26.0, y0 + 92.0), (cx + 12.0, y0 + 150.0), (cx - 8.0, y0 + 186.0)),
+                ((cx - 22.0, y0 + 214.0), (cx - 10.0, y0 + 154.0), (cx + 2.0, y0 + 118.0)),
+            ],
+            steps=56,
+        )
+        return pen.line(pts)
+
+    def left_single_curly_quote(cx: float, y0: float) -> Geom:
+        return affinity.scale(
+            right_single_curly_quote(cx, y0),
+            xfact=-1.0,
+            yfact=1.0,
+            origin=(cx, 0.0),
+        )
+
+    glyphs[" "] = (Polygon(), W_SPACE)
+
+    cx = W_DOT / 2.0
+    glyphs["."] = (pen.dot(cx, period_y, dot_r), W_DOT)
+
+    comma_dot = pen.dot(cx, period_y, dot_r)
+    comma_tail = pen.line([
+        (cx + dot_r * 0.10, period_y + dot_r * 0.20),
+        (cx - dot_r * 0.55, period_y + dot_r * 2.05),
+    ])
+    glyphs[","] = (pen.union(comma_dot, comma_tail), W_DOT)
+
+    glyphs[":"] = (pen.union(
+        pen.dot(cx, upper_dot_y, dot_r),
+        pen.dot(cx, period_y, dot_r),
+    ), W_DOT)
+
+    semi_dot = pen.dot(cx, period_y, dot_r)
+    semi_tail = pen.line([
+        (cx + dot_r * 0.10, period_y + dot_r * 0.20),
+        (cx - dot_r * 0.55, period_y + dot_r * 2.05),
+    ])
+    glyphs[";"] = (pen.union(
+        pen.dot(cx, upper_dot_y, dot_r),
+        semi_dot,
+        semi_tail,
+    ), W_DOT)
+
+    cx = W_EXCL / 2.0
+    excl_stem = pen.vline(cx, yTop + 70.0, yBase - 180.0)
+    excl_dot = pen.dot(cx, period_y, dot_r)
+    glyphs["!"] = (pen.union(excl_stem, excl_dot), W_EXCL)
+
+    cx = W_QUEST / 2.0
+    q0 = (150.0, yTop + 125.0)
+    q_segments = [
+        (
+            (210.0, yTop + 35.0),
+            (330.0, yTop + 20.0),
+            (365.0, yTop + 120.0),
+        ),
+        (
+            (400.0, yTop + 210.0),
+            (300.0, yCapMid - 40.0),
+            (cx,    yCapMid + 35.0),
+        ),
+    ]
+    q_head_pts = cubic_chain_points(q0, q_segments, steps=84)
+    q_head = pen.line(q_head_pts)
+    q_stem = pen.vline(cx, yCapMid + 70.0, yCapMid + 150.0)
+    q_dot = pen.dot(cx, period_y, dot_r)
+    glyphs["?"] = (pen.union(q_head, q_stem, q_dot), W_QUEST)
+
+    cx = W_APOS / 2.0
+    apos = pen.line([
+        (cx + 16.0, yTop + 55.0),
+        (cx + 22.0, yTop + 102.0),
+        (cx - 8.0,  yTop + 170.0),
+    ])
+    glyphs["'"] = (apos, W_APOS)
+
+    q1 = pen.line([
+        (118.0 + 16.0, yTop + 55.0),
+        (118.0 + 22.0, yTop + 102.0),
+        (118.0 - 8.0,  yTop + 170.0),
+    ])
+    q2 = pen.line([
+        (222.0 + 16.0, yTop + 55.0),
+        (222.0 + 22.0, yTop + 102.0),
+        (222.0 - 8.0,  yTop + 170.0),
+    ])
+    glyphs["\""] = (pen.union(q1, q2), W_QUOTE)
+
+    glyphs["-"] = (pen.hline(70.0, W_DASH - 70.0, yXMid), W_DASH)
+    glyphs["–"] = (pen.hline(78.0, W_EN_DASH - 78.0, yXMid), W_EN_DASH)
+    glyphs["—"] = (pen.hline(86.0, W_EM_DASH - 86.0, yXMid), W_EM_DASH)
+
+    glyphs["/"] = (pen.line([
+        (W_SLASH - 70.0, yTop + 55.0),
+        (70.0,           yBase),
+    ]), W_SLASH)
+
+    glyphs["\\"] = (pen.line([
+        (70.0,           yTop + 55.0),
+        (W_SLASH - 70.0, yBase),
+    ]), W_SLASH)
+
+    par_rx = 92.0
+    par_ry = ((yBase - yTop) / 2.0) - 8.0
+    glyphs["("] = (
+        pen.ellipse_arc(
+            W_PAREN - 84.0, yCapMid, par_rx, par_ry,
+            110.0, 250.0, steps=220
+        ),
+        W_PAREN
+    )
+
+    glyphs[")"] = (
+        pen.ellipse_arc(
+            84.0, yCapMid, par_rx, par_ry,
+            290.0, 70.0, steps=220
+        ),
+        W_PAREN
+    )
+
+    bxL = 104.0
+    arm = 92.0
+    by0 = yTop + 40.0
+    by1 = yBase
+    glyphs["["] = (pen.union(
+        pen.vline(bxL, by0, by1),
+        pen.hline(bxL, bxL + arm, by0),
+        pen.hline(bxL, bxL + arm, by1),
+    ), W_BRACKET)
+
+    bxR = W_BRACKET - 104.0
+    glyphs["]"] = (pen.union(
+        pen.vline(bxR, by0, by1),
+        pen.hline(bxR - arm, bxR, by0),
+        pen.hline(bxR - arm, bxR, by1),
+    ), W_BRACKET)
+
+    glyphs["…"] = (pen.union(
+        pen.dot(110.0, period_y, dot_r),
+        pen.dot(W_ELLIPSIS / 2.0, period_y, dot_r),
+        pen.dot(W_ELLIPSIS - 110.0, period_y, dot_r),
+    ), W_ELLIPSIS)
+
+    glyphs["‘"] = (left_single_curly_quote(W_CURLY_SINGLE / 2.0, yTop), W_CURLY_SINGLE)
+    glyphs["’"] = (right_single_curly_quote(W_CURLY_SINGLE / 2.0, yTop), W_CURLY_SINGLE)
+
+    glyphs["“"] = (pen.union(
+        left_single_curly_quote(118.0, yTop),
+        left_single_curly_quote(242.0, yTop),
+    ), W_CURLY_DOUBLE)
+
+    glyphs["”"] = (pen.union(
+        right_single_curly_quote(118.0, yTop),
+        right_single_curly_quote(242.0, yTop),
+    ), W_CURLY_DOUBLE)
 
     return glyphs
 
@@ -1407,13 +1599,21 @@ def main() -> None:
     upper = build_uppercase(m, pen)
     lower = build_lowercase(m, pen)
     digits = build_digits(m, pen)
+    punct = build_punctuation(m, pen)
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
     preview: List[Tuple[str, str]] = []
 
-    chars = args.chars or ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "abcdefghijklmnopqrstuvwxyz" + "0123456789")
+    default_chars = (
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"
+        "0123456789"
+        " !\"'(),-./:;?[]\\"
+        "‘’“”…–—"
+    )
+    chars = args.chars or default_chars
 
     for ch in chars:
         if ch in upper:
@@ -1422,12 +1622,14 @@ def main() -> None:
             g, w = lower[ch]
         elif ch in digits:
             g, w = digits[ch]
+        elif ch in punct:
+            g, w = punct[ch]
         else:
             continue
 
         fname = codepoint_filename(ch)
         write_svg(out / fname, w, m, g)
-        preview.append((ch, fname))
+        preview.append((preview_label(ch), fname))
 
     write_preview_html(out, preview)
     print(f"Wrote {len(preview)} SVGs to: {out}")
