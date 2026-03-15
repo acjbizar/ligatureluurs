@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import html as html_lib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,26 +52,21 @@ class Metrics:
 
 @dataclass(frozen=True)
 class Tune:
-    # Insets
     CAP_INSET: float = 130.0
     DIGIT_INSET: float = 150.0
     LC_INSET: float = 110.0
     STEM_INSET: float = 40.0
 
-    # Curves
     K: float = 0.62
     CURVE_STEPS: int = 90
 
-    # Common arc resolutions (not shapely resolution; just point sampling)
     ARC_STEPS: int = 240
     ELLIPSE_ARC_STEPS: int = 260
 
-    # Optical tweaks
     ROUND_WIDEN: float = 1.14
     DIGIT_OPTICAL: float = 0.96
     SAFE_MARGIN: float = 20.0
 
-    # Lowercase dot placement
     DOT_GAP: float = 160.0
 
 
@@ -176,7 +170,6 @@ def safe_round_rx(W: float, pen_r: float, rx: float, safe_margin: float) -> floa
     return min(rx, (W / 2.0) - pen_r - safe_margin)
 
 
-# Corner builders: repeated patterns in n/h/m and u/w/y
 def corner_h_to_v(
     p0: Tuple[float, float],
     dx: float,
@@ -223,7 +216,6 @@ def cubic_chain_points(
     return pts
 
 
-# Normalized from the SVG render shown in chat.
 S_CAP_SPEC = {
     "start": (0.965, 0.086),
     "segments": [
@@ -345,22 +337,6 @@ def codepoint_filename(s: str) -> str:
     return f"character-{code}.svg"
 
 
-def preview_label(ch: str) -> str:
-    return {
-        " ": "SPACE",
-        "\"": "QUOTATION MARK",
-        "'": "APOSTROPHE",
-        "\\": "BACKSLASH",
-        "‘": "LEFT SINGLE QUOTATION MARK",
-        "’": "RIGHT SINGLE QUOTATION MARK",
-        "“": "LEFT DOUBLE QUOTATION MARK",
-        "”": "RIGHT DOUBLE QUOTATION MARK",
-        "…": "ELLIPSIS",
-        "–": "EN DASH",
-        "—": "EM DASH",
-    }.get(ch, ch)
-
-
 def geom_to_svg_path(g: Geom) -> str:
     if g.is_empty:
         return ""
@@ -394,47 +370,6 @@ def write_svg(out_path: Path, width: float, m: Metrics, g: Geom) -> None:
         f'</svg>\n'
     )
     out_path.write_text(svg, encoding="utf-8")
-
-
-def write_preview_html(out_dir: Path, items: List[Tuple[str, str]]) -> None:
-    cells = []
-    for label, fname in sorted(items, key=lambda t: t[1]):
-        label_text = html_lib.escape(label)
-        file_text = html_lib.escape(fname)
-        src_attr = html_lib.escape(fname, quote=True)
-        alt_attr = html_lib.escape(label, quote=True)
-
-        cells.append(f"""
-<div class="cell">
-  <div class="label">{label_text}</div>
-  <div class="file">{file_text}</div>
-  <img src="{src_attr}" alt="{alt_attr}">
-</div>
-""".strip())
-
-    html_doc = f"""<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Ligatureluurs sketches</title>
-<style>
-body{{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:20px}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}}
-.cell{{border:1px solid #ddd;border-radius:12px;padding:10px}}
-.label{{font-size:13px;font-weight:650;margin-bottom:4px}}
-.file{{font-size:11px;opacity:.7;margin-bottom:8px}}
-img{{width:100%;height:auto;display:block;background:#fff;border-radius:8px}}
-</style>
-</head>
-<body>
-<h1>Ligatureluurs SVG sketches</h1>
-<div class="grid">
-{chr(10).join(cells)}
-</div>
-</body>
-</html>
-"""
-    (out_dir / "preview.html").write_text(html_doc, encoding="utf-8")
 
 
 # ----------------------------
@@ -1604,8 +1539,6 @@ def main() -> None:
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    preview: List[Tuple[str, str]] = []
-
     default_chars = (
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
@@ -1615,6 +1548,7 @@ def main() -> None:
     )
     chars = args.chars or default_chars
 
+    count = 0
     for ch in chars:
         if ch in upper:
             g, w = upper[ch]
@@ -1629,11 +1563,9 @@ def main() -> None:
 
         fname = codepoint_filename(ch)
         write_svg(out / fname, w, m, g)
-        preview.append((preview_label(ch), fname))
+        count += 1
 
-    write_preview_html(out, preview)
-    print(f"Wrote {len(preview)} SVGs to: {out}")
-    print(f"Open: {out / 'preview.html'}")
+    print(f"Wrote {count} SVGs to: {out}")
 
 
 if __name__ == "__main__":
