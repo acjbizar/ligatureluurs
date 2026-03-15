@@ -735,35 +735,55 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs: Dict[str, Tuple[Geom, float]] = {}
 
-    glyphs["0"] = (pen.ellipse_stroke(cx, yMid, orx, ory), W)
+    # ------------------------------------------------------------------
+    # Shared optical frame for all digits
+    # ------------------------------------------------------------------
+    yD_top = yTop + ory * 0.08
+    yD_bot = yBase - ory * 0.06
+    yD_mid = (yD_top + yD_bot) / 2.0
+    hD = yD_bot - yD_top
 
-    pad_y = ory * 0.10
-    y1_top = yTop + pad_y
-    y1_bot = yBase - pad_y
+    # Rounded digits need a little overshoot to look equal in height.
+    round_overshoot = hD * 0.015
+    yR_top = yD_top - round_overshoot
+    yR_bot = yD_bot + round_overshoot
+    yR_mid = (yR_top + yR_bot) / 2.0
+    hR = yR_bot - yR_top
+
+    xD_left = xL + orx * 0.04
+    xD_right = xR - orx * 0.04
+    wD = xD_right - xD_left
+
+    # 0 ----------------------------------------------------------------
+    rx0 = wD * 0.50
+    ry0 = hR * 0.50
+    glyphs["0"] = (pen.ellipse_stroke(cx, yR_mid, rx0, ry0), W)
+
+    # 1 ----------------------------------------------------------------
+    y1_top = yD_top
+    y1_bot = yD_bot
     x1 = cx
 
-    flag_len = (xR - xL) * 0.28
+    flag_len = wD * 0.24
     one_flag = pen.hline(x1 - flag_len, x1, y1_top)
     one_stem = pen.vline(x1, y1_top, y1_bot)
 
-    base_half = max(flag_len, (xR - xL) * 0.18)
+    base_half = max(flag_len * 1.02, wD * 0.18)
     one_base = pen.hline(x1 - base_half, x1 + base_half, y1_bot)
     glyphs["1"] = (pen.union(one_flag, one_stem, one_base), W)
 
-    cap_h = (yBase - yTop)
-    TWO_WIDEN = 0.22
+    # 2 ----------------------------------------------------------------
+    TWO_WIDEN = 0.14
+    pad2 = wD * TWO_WIDEN
 
-    inner_w = (xR - xL)
-    pad = inner_w * TWO_WIDEN
-
-    xL2 = max(pen.r + 2.0, xL - pad)
-    xR2 = min(W - pen.r - 2.0, xR + pad)
+    xL2 = max(pen.r + 2.0, xD_left - pad2)
+    xR2 = min(W - pen.r - 2.0, xD_right + pad2)
 
     def X(frac: float) -> float:
         return xL2 + (xR2 - xL2) * frac
 
     def Y(t: float) -> float:
-        return yTop + cap_h * t
+        return yD_top + hD * t
 
     p0  = (X(190 / 700), Y((260 - 40) / 740))
     c01 = (X(240 / 700), Y((150 - 40) / 740))
@@ -776,21 +796,21 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     c21 = (X(350 / 700), Y((510 - 40) / 740))
     c22 = (X(300 / 700), Y((540 - 40) / 740))
-    p3  = (X(260 / 700), Y((610 - 40) / 740))
+    p3  = (X(250 / 700), Y((610 - 40) / 740))
 
-    p4  = (X(170 / 700), yBase)
-    p5  = (X(520 / 700), yBase)
+    p4  = (X(150 / 700), yD_bot)
+    p5  = (X(530 / 700), yD_bot)
 
     shape_pts = [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
     y_min = min(y for _, y in shape_pts)
-    target_top = yTop + pen.r * 0.35
+    target_top = yD_top + pen.r * 0.18
 
-    s = (yBase - target_top) / (yBase - y_min)
-    s = max(1.0, min(s, 1.45))
+    s = (yD_bot - target_top) / (yD_bot - y_min)
+    s = max(1.0, min(s, 1.42))
 
     def SY(pt):
         x, y = pt
-        return (x, yBase - (yBase - y) * s)
+        return (x, yD_bot - (yD_bot - y) * s)
 
     p0, c01, c02, p1, c11, c12, p2, c21, c22, p3 = map(
         SY, [p0, c01, c02, p1, c11, c12, p2, c21, c22, p3]
@@ -803,18 +823,19 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     two_pts = seg0 + seg1 + seg2 + [p4, p5]
     glyphs["2"] = (pen.line(two_pts), W)
 
-    pad_x = orx * 0.12
-    pad_y = ory * 0.06
+    # 3 ----------------------------------------------------------------
+    pad_x3 = orx * 0.10
+    pad_y3 = ory * 0.02
 
-    x3_left = xL + pad_x
-    x3_right = xR - pad_x
+    x3_left = xL + pad_x3
+    x3_right = xR - pad_x3 * 0.70
 
-    y3_top = yTop + pad_y
-    y3_bot = yBase - pad_y
+    y3_top = yD_top + pad_y3
+    y3_bot = yD_bot
     y3_mid = (y3_top + y3_bot) / 2.0
 
     w3 = x3_right - x3_left
-    r3 = w3 * 0.46
+    r3 = w3 * 0.44
     cx3r = x3_right - r3
 
     u_cy = (y3_top + y3_mid) / 2.0
@@ -822,13 +843,17 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     l_cy = (y3_mid + y3_bot) / 2.0
     l_ry = (y3_bot - y3_mid) / 2.0
 
-    three_u = pen.line(ellipse_arc_points(cx3r, u_cy, r3, u_ry, 270.0, 90.0, clockwise=False, steps=260))
-    three_l = pen.line(ellipse_arc_points(cx3r, l_cy, r3, l_ry, 270.0, 90.0, clockwise=False, steps=260))
+    three_u = pen.line(
+        ellipse_arc_points(cx3r, u_cy, r3, u_ry, 270.0, 90.0, clockwise=False, steps=260)
+    )
+    three_l = pen.line(
+        ellipse_arc_points(cx3r, l_cy, r3, l_ry, 270.0, 90.0, clockwise=False, steps=260)
+    )
     three_right = pen.union(three_u, three_l)
 
-    LEFT_SCALE = 0.70
-    TOP_END_DEG = 210.0
-    BOT_END_DEG = 150.0
+    LEFT_SCALE = 0.72
+    TOP_END_DEG = 208.0
+    BOT_END_DEG = 152.0
 
     rxL_top = r3 * LEFT_SCALE
     ryL_top = u_ry * LEFT_SCALE
@@ -838,52 +863,61 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     x_kink = x3_left + rxL_top
 
     top_arc = ellipse_arc_points(
-        cx=x_kink, cy=y3_top + ryL_top,
-        rx=rxL_top, ry=ryL_top,
-        deg0=270.0, deg1=TOP_END_DEG,
+        cx=x_kink,
+        cy=y3_top + ryL_top,
+        rx=rxL_top,
+        ry=ryL_top,
+        deg0=270.0,
+        deg1=TOP_END_DEG,
         clockwise=True,
-        steps=170
+        steps=170,
     )
     three_top = pen.line([(cx3r, y3_top), (x_kink, y3_top)] + top_arc[1:])
 
     bot_arc = ellipse_arc_points(
-        cx=x_kink, cy=y3_bot - ryL_bot,
-        rx=rxL_bot, ry=ryL_bot,
-        deg0=90.0, deg1=BOT_END_DEG,
+        cx=x_kink,
+        cy=y3_bot - ryL_bot,
+        rx=rxL_bot,
+        ry=ryL_bot,
+        deg0=90.0,
+        deg1=BOT_END_DEG,
         clockwise=False,
-        steps=170
+        steps=170,
     )
     three_bot = pen.line([(cx3r, y3_bot), (x_kink, y3_bot)] + bot_arc[1:])
 
-    mid_x0 = x3_left + (cx3r - x3_left) * 0.42
-    mid_x1 = cx3r + r3 * 0.20
+    mid_x0 = x3_left + (cx3r - x3_left) * 0.40
+    mid_x1 = cx3r + r3 * 0.16
     three_mid = pen.hline(mid_x0, mid_x1, y3_mid)
 
     glyphs["3"] = (pen.union(three_right, three_top, three_mid, three_bot), W)
 
-    x4_stem = xR
-    y4_top = yTop
-    y4_cross = yMid + ory * 0.05
-    x4_left = xL
+    # 4 ----------------------------------------------------------------
+    x4_stem = xR - orx * 0.02
+    y4_top = yD_top
+    y4_cross = yD_mid + hD * 0.03
+    x4_left = xL + orx * 0.04
 
-    four_stem = pen.vline(x4_stem, y4_top, yBase)
+    four_stem = pen.vline(x4_stem, y4_top, yD_bot)
     four_bar = pen.hline(x4_left, x4_stem, y4_cross)
     four_diag = pen.line([(x4_left, y4_cross), (x4_stem, y4_top)])
     glyphs["4"] = (pen.union(four_stem, four_bar, four_diag), W)
 
-    y5_top = yTop + ory * 0.10
-    y5_mid = yTop + (yBase - yTop) * 0.44
-    y5_bot = yBase - ory * 0.10
+    # 5 ----------------------------------------------------------------
+    y5_top = yD_top
+    y5_mid = yD_top + hD * 0.45
+    y5_bot = yD_bot
 
-    x5_left = xL + orx * 0.02
+    x5_left = xL + orx * 0.11
+    x5_right = xR - orx * 0.05
 
     cy5 = (y5_mid + y5_bot) / 2.0
     ry5 = (y5_bot - y5_mid) / 2.0
 
-    bulge5 = ry5 * 1.00
-    x5_join = xR - bulge5
+    bulge5 = ry5 * 0.92
+    x5_join = x5_right - bulge5 * 0.92
 
-    five_top = pen.hline(x5_left, xR, y5_top)
+    five_top = pen.hline(x5_left, x5_right, y5_top)
     five_left = pen.vline(x5_left, y5_top, y5_mid)
     five_mid = pen.hline(x5_left, x5_join, y5_mid)
     five_bot = pen.hline(x5_left, x5_join, y5_bot)
@@ -894,36 +928,44 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["5"] = (pen.union(five_top, five_left, five_mid, five_bot, five_loop), W)
 
-    six_rx = orx * 0.92
-    six_ry = ory * 0.60
-    six_cx = cx + 15.0
-    six_cy = yBase - six_ry
+    # 6 ----------------------------------------------------------------
+    six_rx = orx * 0.98
+    six_ry = hR * 0.34
+    six_cx = cx + orx * 0.08
+    six_cy = yR_bot - six_ry
 
     six_bowl = pen.ellipse_stroke(six_cx, six_cy, six_rx, six_ry)
 
     x_attach = six_cx - six_rx
     y_attach = six_cy
 
-    y_arc = yTop + (yBase - yTop) * 0.27
-    six_stem = pen.vline(x_attach, y_attach, y_arc)
+    # Make the top arc align optically with the rounded overshoot top.
+    y_arc = yR_top + six_ry
+    six_stem = pen.vline(x_attach, y_arc, y_attach)
 
-    ARC_END_DEG = 330.0
-    six_top_arc = pen.ellipse_arc(six_cx, y_arc, six_rx, six_ry, 180.0, ARC_END_DEG, steps=240)
+    ARC_END_DEG = 328.0
+    six_top_arc = pen.ellipse_arc(
+        six_cx, y_arc, six_rx, six_ry, 180.0, ARC_END_DEG, steps=240
+    )
 
     glyphs["6"] = (pen.union(six_bowl, six_stem, six_top_arc), W)
 
-    seven_top = pen.hline(xL, xR, yTop + ory * 0.08)
-    seven_diag = pen.line([(xR, yTop + ory * 0.08), (xL + orx * 0.18, yBase)])
+    # 7 ----------------------------------------------------------------
+    y7_top = yD_top
+    seven_top = pen.hline(xD_left, xD_right, y7_top)
+    seven_diag = pen.line([(xD_right, y7_top), (xL + orx * 0.20, yD_bot)])
     glyphs["7"] = (pen.union(seven_top, seven_diag), W)
 
-    rx8_top, ry8_top = orx * 0.94, ory * 0.40
-    rx8_bot, ry8_bot = orx * 1.02, ory * 0.46
+    # 8 ----------------------------------------------------------------
+    # More overlap between the outer strokes, but keep two separate counters.
+    h8 = yR_bot - yR_top
+    rx8_top = wD * 0.46
+    ry8_top = h8 * 0.235
+    rx8_bot = wD * 0.49
+    ry8_bot = h8 * 0.265
 
-    overlap_outline = pen.r * 0.80
-    dy = (ry8_top + ry8_bot) + 2.0 * pen.r - overlap_outline
-
-    cy8_top = yMid - dy / 2.0
-    cy8_bot = yMid + dy / 2.0
+    cy8_top = yR_top + ry8_top
+    cy8_bot = yR_bot - ry8_bot
 
     eight = pen.union(
         pen.ellipse_stroke(cx, cy8_top, rx8_top, ry8_top),
@@ -931,8 +973,9 @@ def build_digits(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
     )
     glyphs["8"] = (eight, W)
 
+    # 9 ----------------------------------------------------------------
     g6, _ = glyphs["6"]
-    origin = (W / 2.0, (m.CAP_TOP + m.BASE) / 2.0)
+    origin = (W / 2.0, yR_mid)
     g9 = affinity.rotate(g6, 180.0, origin=origin)
     glyphs["9"] = (g9, W)
 
