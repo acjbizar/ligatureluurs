@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="en" data-theme="device">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ligatureluurs — Interactive Sample</title>
+
+    <style>
+        @font-face {
+            font-family: "Ligatureluurs";
+            src:
+                    url("../dist/fonts/ligatureluurs.woff2") format("woff2"),
+                    url("../dist/fonts/ligatureluurs.woff") format("woff"),
+                    url("../dist/fonts/ligatureluurs.ttf") format("truetype");
+            font-weight: 1 1000;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        :root {
+            --bg: #f5f5f5;
+            --fg: #111111;
+            --panel: #ffffff;
+            --panel-soft: #fbfbfb;
+            --border: #dddddd;
+            --muted: rgba(0,0,0,.58);
+            --muted-strong: rgba(0,0,0,.78);
+            --shadow: 0 10px 28px rgba(0,0,0,.06);
+            --button-bg: #ffffff;
+            --button-hover: #f4f4f4;
+            --chip-bg: #f3f3f3;
+            --chip-border: #e4e4e4;
+            --dash: rgba(0,0,0,.18);
+            --sample-bg: rgba(255,255,255,.72);
+            --header-bg: linear-gradient(to bottom, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            --focus: rgba(43,118,255,.18);
+            --accent: #2b76ff;
+
+            --size: 96px;
+            --line: 1.05;
+            --track: 0em;
+            --pad: 24px;
+            --wght: 400;
+
+            --show-guides: 1;
+            --baseline-em: 0.78em;
+            --cap-em: 0.06em;
+            --xh-em: 0.34em;
+
+            --liga: 1;
+            --kern: 1;
+        }
+
+        html[data-theme="light"] {
+            --bg: #f5f5f5;
+            --fg: #111111;
+            --panel: #ffffff;
+            --panel-soft: #fbfbfb;
+            --border: #dddddd;
+            --muted: rgba(0,0,0,.58);
+            --muted-strong: rgba(0,0,0,.78);
+            --shadow: 0 10px 28px rgba(0,0,0,.06);
+            --button-bg: #ffffff;
+            --button-hover: #f4f4f4;
+            --chip-bg: #f3f3f3;
+            --chip-border: #e4e4e4;
+            --dash: rgba(0,0,0,.18);
+            --sample-bg: rgba(255,255,255,.72);
+            --header-bg: linear-gradient(to bottom, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            --focus: rgba(43,118,255,.18);
+            --accent: #2b76ff;
+        }
+
+        html[data-theme="dark"] {
+            --bg: #0f1115;
+            --fg: #eceef2;
+            --panel: #171b22;
+            --panel-soft: #11151b;
+            --border: #2a2f38;
+            --muted: rgba(255,255,255,.58);
+            --muted-strong: rgba(255,255,255,.82);
+            --shadow: 0 10px 28px rgba(0,0,0,.28);
+            --button-bg: #1b2028;
+            --button-hover: #232933;
+            --chip-bg: #10151c;
+            --chip-border: #2a2f38;
+            --dash: rgba(255,255,255,.18);
+            --sample-bg: rgba(255,255,255,.04);
+            --header-bg: linear-gradient(to bottom, rgba(23,27,34,.92), rgba(23,27,34,.72));
+            --focus: rgba(101,155,255,.22);
+            --accent: #7aa8ff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html[data-theme="device"] {
+                --bg: #0f1115;
+                --fg: #eceef2;
+                --panel: #171b22;
+                --panel-soft: #11151b;
+                --border: #2a2f38;
+                --muted: rgba(255,255,255,.58);
+                --muted-strong: rgba(255,255,255,.82);
+                --shadow: 0 10px 28px rgba(0,0,0,.28);
+                --button-bg: #1b2028;
+                --button-hover: #232933;
+                --chip-bg: #10151c;
+                --chip-border: #2a2f38;
+                --dash: rgba(255,255,255,.18);
+                --sample-bg: rgba(255,255,255,.04);
+                --header-bg: linear-gradient(to bottom, rgba(23,27,34,.92), rgba(23,27,34,.72));
+                --focus: rgba(101,155,255,.22);
+                --accent: #7aa8ff;
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            html[data-theme="device"] {
+                --bg: #f5f5f5;
+                --fg: #111111;
+                --panel: #ffffff;
+                --panel-soft: #fbfbfb;
+                --border: #dddddd;
+                --muted: rgba(0,0,0,.58);
+                --muted-strong: rgba(0,0,0,.78);
+                --shadow: 0 10px 28px rgba(0,0,0,.06);
+                --button-bg: #ffffff;
+                --button-hover: #f4f4f4;
+                --chip-bg: #f3f3f3;
+                --chip-border: #e4e4e4;
+                --dash: rgba(0,0,0,.18);
+                --sample-bg: rgba(255,255,255,.72);
+                --header-bg: linear-gradient(to bottom, rgba(255,255,255,.92), rgba(255,255,255,.72));
+                --focus: rgba(43,118,255,.18);
+                --accent: #2b76ff;
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--header-bg);
+            backdrop-filter: blur(6px);
+        }
+
+        header .title {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 750;
+            letter-spacing: .2px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .headerRight {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            max-width: 100%;
+        }
+
+        .modeSwitch {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 4px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .modeBtn {
+            border: 0;
+            background: transparent;
+            color: var(--muted-strong);
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .modeBtn.active {
+            background: var(--chip-bg);
+            box-shadow: inset 0 0 0 1px var(--chip-border);
+            color: var(--fg);
+        }
+
+        .wrap {
+            display: grid;
+            grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+            gap: 16px;
+            padding: 16px;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            align-items: start;
+        }
+
+        @media (max-width: 980px) {
+            .wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .controlsCard {
+            position: sticky;
+            top: 16px;
+            align-self: start;
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+        }
+
+        @media (max-width: 980px) {
+            .controlsCard {
+                position: static;
+                top: auto;
+                max-height: none;
+                overflow: visible;
+            }
+        }
+
+        .card .hd {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            background: var(--panel-soft);
+        }
+
+        .card .bd {
+            padding: 14px 16px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 160px;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .row > label {
+            font-size: 12px;
+            color: var(--muted-strong);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .row > label small {
+            color: var(--muted);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        input[type="color"] {
+            width: 44px;
+            height: 30px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: transparent;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 140px;
+            resize: vertical;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.35;
+            background: var(--panel-soft);
+            color: var(--fg);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--focus);
+        }
+
+        .btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        button {
+            border: 1px solid var(--border);
+            background: var(--button-bg);
+            color: var(--fg);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-weight: 650;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .toggles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .toggle {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: var(--button-bg);
+        }
+
+        .toggle span {
+            font-size: 12px;
+            font-weight: 650;
+            color: var(--muted-strong);
+        }
+
+        .previewWrap {
+            padding: 0;
+            min-width: 0;
+        }
+
+        .previewToolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel-soft);
+            flex-wrap: wrap;
+        }
+
+        .previewToolbar .hint {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .previewToolbar code,
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 11px;
+            background: var(--chip-bg);
+            color: var(--fg);
+            padding: 2px 6px;
+            border-radius: 8px;
+            border: 1px solid var(--chip-border);
+        }
+
+        .preview {
+            padding: var(--pad);
+            background: var(--bg);
+            min-height: calc(100vh - 140px);
+        }
+
+        .sample {
+            font-family: "Ligatureluurs", sans-serif;
+            font-weight: var(--wght);
+            font-variation-settings: "wght" var(--wght);
+            font-size: var(--size);
+            line-height: var(--line);
+            letter-spacing: var(--track);
+            color: var(--fg);
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-feature-settings: "liga" var(--liga), "kern" var(--kern);
+            position: relative;
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px dashed var(--dash);
+            background: var(--sample-bg);
+            min-height: 220px;
+            outline: none;
+        }
+
+        .sample[contenteditable="true"] {
+            cursor: text;
+        }
+
+        .sample:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--focus);
+        }
+
+        .sample.guides::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: 14px;
+            background:
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--baseline-em) - 0.75px),
+                            rgba(255,0,0,.25) calc(var(--baseline-em) - 0.75px),
+                            rgba(255,0,0,.25) calc(var(--baseline-em) + 0.75px),
+                            transparent calc(var(--baseline-em) + 0.75px)
+                    ),
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--cap-em) - 0.75px),
+                            rgba(0,128,255,.22) calc(var(--cap-em) - 0.75px),
+                            rgba(0,128,255,.22) calc(var(--cap-em) + 0.75px),
+                            transparent calc(var(--cap-em) + 0.75px)
+                    ),
+                    linear-gradient(
+                            to bottom,
+                            transparent calc(var(--xh-em) - 0.75px),
+                            rgba(0,180,120,.20) calc(var(--xh-em) - 0.75px),
+                            rgba(0,180,120,.20) calc(var(--xh-em) + 0.75px),
+                            transparent calc(var(--xh-em) + 0.75px)
+                    );
+            opacity: var(--show-guides);
+        }
+
+        .glyphGridTitle {
+            margin: 10px 0 10px 2px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .glyphGrid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+            gap: 10px;
+        }
+
+        .gcell {
+            background: var(--sample-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            min-width: 0;
+        }
+
+        .gcell .ch {
+            font-family: "Ligatureluurs", sans-serif;
+            font-weight: var(--wght);
+            font-variation-settings: "wght" var(--wght);
+            font-size: 44px;
+            line-height: 1.05;
+            letter-spacing: var(--track);
+            font-feature-settings: "liga" var(--liga), "kern" var(--kern);
+            min-height: 48px;
+            display: grid;
+            place-items: center;
+        }
+
+        .gcell .lab {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--muted);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            word-break: break-word;
+        }
+
+        .note {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 10px;
+            line-height: 1.45;
+        }
+
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <div class="title">
+        <div>
+            <h1>Ligatureluurs — interactive font sample</h1>
+            <div class="subtitle">Loading: <code>../dist/fonts/ligatureluurs.woff2</code> (fallback to WOFF/TTF)</div>
+        </div>
+
+        <div class="headerRight">
+            <div class="modeSwitch" role="group" aria-label="Appearance">
+                <button class="modeBtn" type="button" data-theme-mode="device">Device</button>
+                <button class="modeBtn" type="button" data-theme-mode="light">Light</button>
+                <button class="modeBtn" type="button" data-theme-mode="dark">Dark</button>
+            </div>
+            <div class="subtitle" id="status">Font loading… • Manifest loading…</div>
+        </div>
+    </div>
+</header>
+
+<div class="wrap">
+    <section class="card controlsCard">
+        <div class="hd">
+            <span>Controls</span>
+            <button id="resetBtn" type="button">Reset</button>
+        </div>
+
+        <div class="bd">
+            <div class="row">
+                <label>Font size <small id="vSize"></small></label>
+                <input id="size" type="range" min="16" max="240" step="1" />
+            </div>
+
+            <div class="row">
+                <label>Weight <small id="vWght"></small></label>
+                <input id="wght" type="range" min="1" max="1000" step="1" />
+            </div>
+
+            <div class="row">
+                <label>Line height <small id="vLine"></small></label>
+                <input id="line" type="range" min="0.80" max="2.20" step="0.01" />
+            </div>
+
+            <div class="row">
+                <label>Tracking (em) <small id="vTrack"></small></label>
+                <input id="track" type="range" min="-0.10" max="0.30" step="0.005" />
+            </div>
+
+            <div class="row">
+                <label>Padding <small id="vPad"></small></label>
+                <input id="pad" type="range" min="0" max="80" step="1" />
+            </div>
+
+            <div class="row">
+                <label>Text color <small id="vFg"></small></label>
+                <input id="fg" type="color" />
+            </div>
+
+            <div class="row">
+                <label>Background <small id="vBg"></small></label>
+                <input id="bg" type="color" />
+            </div>
+
+            <div class="toggles">
+                <label class="toggle">
+                    <span>Ligatures (liga)</span>
+                    <input id="liga" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Kerning (kern)</span>
+                    <input id="kern" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Guides overlay</span>
+                    <input id="guides" type="checkbox" checked />
+                </label>
+                <label class="toggle">
+                    <span>Glyph grid</span>
+                    <input id="grid" type="checkbox" checked />
+                </label>
+            </div>
+
+            <div style="height:12px"></div>
+
+            <div class="row">
+                <label>Baseline (em) <small id="vBase"></small></label>
+                <input id="baseline" type="range" min="0.20" max="1.20" step="0.01" />
+            </div>
+
+            <div class="row">
+                <label>Cap line (em) <small id="vCap"></small></label>
+                <input id="cap" type="range" min="0.00" max="0.30" step="0.005" />
+            </div>
+
+            <div class="row">
+                <label>X-height line (em) <small id="vXh"></small></label>
+                <input id="xh" type="range" min="0.15" max="0.70" step="0.01" />
+            </div>
+
+            <div style="height:10px"></div>
+
+            <label for="text" style="font-size:12px;font-weight:700;color:var(--muted-strong)">Sample text</label>
+            <div style="height:8px"></div>
+            <textarea id="text"></textarea>
+
+            <div class="btns">
+                <button type="button" data-preset="hamburgefontsiv">Hamburgefontsiv</button>
+                <button type="button" data-preset="pairs">Pairs</button>
+                <button type="button" data-preset="digits">Digits</button>
+                <button type="button" data-preset="pangram">Pangram</button>
+            </div>
+
+            <div class="note">
+                The big sample on the right is editable too, and stays synced with this textarea.
+                Manifest loading tries <code>data/manifest.json</code> first, then a few nearby fallback paths.
+            </div>
+        </div>
+    </section>
+
+    <section class="card previewWrap">
+        <div class="previewToolbar">
+            <div class="hint">
+                Preview <span style="opacity:.45">•</span> edit the large sample directly <span style="opacity:.45">•</span> <code id="liveCss"></code>
+            </div>
+            <button id="copyCssBtn" type="button">Copy CSS</button>
+        </div>
+
+        <div class="preview">
+            <div
+                    id="sample"
+                    class="sample guides"
+                    contenteditable="true"
+                    spellcheck="false"
+                    role="textbox"
+                    aria-multiline="true"
+                    aria-label="Editable letter sample"
+            ></div>
+
+            <div id="gridWrap" style="margin-top:16px">
+                <div id="glyphGridTitle" class="glyphGridTitle">Glyph quick look</div>
+                <div id="glyphGrid" class="glyphGrid"></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    (() => {
+        const root = document.documentElement;
+        const statusEl = document.getElementById("status");
+
+        const el = {
+            size: document.getElementById("size"),
+            wght: document.getElementById("wght"),
+            line: document.getElementById("line"),
+            track: document.getElementById("track"),
+            pad: document.getElementById("pad"),
+            fg: document.getElementById("fg"),
+            bg: document.getElementById("bg"),
+            liga: document.getElementById("liga"),
+            kern: document.getElementById("kern"),
+            guides: document.getElementById("guides"),
+            grid: document.getElementById("grid"),
+            baseline: document.getElementById("baseline"),
+            cap: document.getElementById("cap"),
+            xh: document.getElementById("xh"),
+            text: document.getElementById("text"),
+            sample: document.getElementById("sample"),
+            glyphGrid: document.getElementById("glyphGrid"),
+            glyphGridTitle: document.getElementById("glyphGridTitle"),
+            gridWrap: document.getElementById("gridWrap"),
+            liveCss: document.getElementById("liveCss"),
+            copyCssBtn: document.getElementById("copyCssBtn"),
+            resetBtn: document.getElementById("resetBtn"),
+            themeBtns: Array.from(document.querySelectorAll("[data-theme-mode]")),
+        };
+
+        const val = {
+            vSize: document.getElementById("vSize"),
+            vWght: document.getElementById("vWght"),
+            vLine: document.getElementById("vLine"),
+            vTrack: document.getElementById("vTrack"),
+            vPad: document.getElementById("vPad"),
+            vFg: document.getElementById("vFg"),
+            vBg: document.getElementById("vBg"),
+            vBase: document.getElementById("vBase"),
+            vCap: document.getElementById("vCap"),
+            vXh: document.getElementById("vXh"),
+        };
+
+        const presets = {
+            hamburgefontsiv: "HAMBURGEFONTSIV\nhamburgefontsiv\n0123456789\n\nAa Bb Cc Dd Ee Ff Gg Hh Ii Jj\nKk Ll Mm Nn Oo Pp Qq Rr Ss Tt\nUu Vv Ww Xx Yy Zz",
+            pairs: "Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll\nMm Nn Oo Pp Qq Rr Ss Tt Uu Vv\nWw Xx Yy Zz\n\nst ct sh th ff fi fl",
+            digits: "0123456789\n10 11 12 13 14 15 16 17 18 19\n20 21 22 23 24 25 26 27 28 29\n\n2026  123456  98  0  7  42",
+            pangram: "SPHINX OF BLACK QUARTZ JUDGE MY VOW\nTHE QUICK BROWN FOX JUMPS OVER THE LAZY DOG\n\nsphinx of black quartz judge my vow\nthe quick brown fox jumps over the lazy dog\n\n0123456789",
+        };
+
+        const defaults = {
+            size: 96,
+            wght: 400,
+            line: 1.05,
+            track: 0,
+            pad: 24,
+            fg: "#111111",
+            bg: "#f5f5f5",
+            liga: true,
+            kern: true,
+            guides: true,
+            grid: true,
+            baseline: 0.78,
+            cap: 0.06,
+            xh: 0.34,
+            text: presets.hamburgefontsiv,
+            theme: "device",
+        };
+
+        const LS_KEY = "ligatureluurs.sample.settings.v3";
+
+        let state = loadSettings();
+        let fontStatusText = "Font loading…";
+        let manifestStatusText = "Manifest loading…";
+
+        function loadSettings() {
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (!raw) return { ...defaults };
+                const obj = JSON.parse(raw);
+                return { ...defaults, ...obj };
+            } catch {
+                return { ...defaults };
+            }
+        }
+
+        function saveSettings(s) {
+            try {
+                localStorage.setItem(LS_KEY, JSON.stringify(s));
+            } catch {}
+        }
+
+        function setVar(name, value) {
+            root.style.setProperty(name, value);
+        }
+
+        function clamp(n, a, b) {
+            return Math.min(b, Math.max(a, n));
+        }
+
+        function normalizeText(text) {
+            return String(text ?? "").replace(/\r\n?/g, "\n");
+        }
+
+        function getEditableText(node) {
+            return normalizeText(node.innerText || node.textContent || "");
+        }
+
+        function updateStatus() {
+            statusEl.textContent = `${fontStatusText} • ${manifestStatusText}`;
+        }
+
+        function setTheme(theme) {
+            const next = ["device", "light", "dark"].includes(theme) ? theme : "device";
+            root.setAttribute("data-theme", next);
+
+            el.themeBtns.forEach(btn => {
+                const active = btn.dataset.themeMode === next;
+                btn.classList.toggle("active", active);
+                btn.setAttribute("aria-pressed", active ? "true" : "false");
+            });
+        }
+
+        function updateLabels(s) {
+            val.vSize.textContent = s.size + "px";
+            val.vWght.textContent = String(s.wght);
+            val.vLine.textContent = s.line.toFixed(2);
+            val.vTrack.textContent = s.track.toFixed(3) + "em";
+            val.vPad.textContent = s.pad + "px";
+            val.vFg.textContent = s.fg;
+            val.vBg.textContent = s.bg;
+            val.vBase.textContent = s.baseline.toFixed(2) + "em";
+            val.vCap.textContent = s.cap.toFixed(3) + "em";
+            val.vXh.textContent = s.xh.toFixed(2) + "em";
+
+            el.liveCss.textContent =
+                `font-size:${s.size}px; font-weight:${s.wght}; line-height:${s.line.toFixed(2)}; ` +
+                `letter-spacing:${s.track.toFixed(3)}em; ` +
+                `font-feature-settings:"liga" ${s.liga ? 1 : 0},"kern" ${s.kern ? 1 : 0};`;
+        }
+
+        function apply(nextState, opts = {}) {
+            const options = {
+                syncTextarea: true,
+                syncSample: true,
+                save: true,
+                ...opts,
+            };
+
+            state = { ...state, ...nextState };
+
+            setVar("--size", state.size + "px");
+            setVar("--wght", String(state.wght));
+            setVar("--line", String(state.line));
+            setVar("--track", state.track + "em");
+            setVar("--pad", state.pad + "px");
+            setVar("--fg", state.fg);
+            setVar("--bg", state.bg);
+            setVar("--liga", state.liga ? 1 : 0);
+            setVar("--kern", state.kern ? 1 : 0);
+            setVar("--show-guides", state.guides ? 1 : 0);
+            setVar("--baseline-em", state.baseline + "em");
+            setVar("--cap-em", state.cap + "em");
+            setVar("--xh-em", state.xh + "em");
+
+            setTheme(state.theme);
+
+            el.size.value = String(state.size);
+            el.wght.value = String(state.wght);
+            el.line.value = String(state.line);
+            el.track.value = String(state.track);
+            el.pad.value = String(state.pad);
+            el.fg.value = state.fg;
+            el.bg.value = state.bg;
+            el.liga.checked = !!state.liga;
+            el.kern.checked = !!state.kern;
+            el.guides.checked = !!state.guides;
+            el.grid.checked = !!state.grid;
+            el.baseline.value = String(state.baseline);
+            el.cap.value = String(state.cap);
+            el.xh.value = String(state.xh);
+
+            if (options.syncTextarea && el.text.value !== state.text) {
+                el.text.value = state.text;
+            }
+
+            if (options.syncSample && getEditableText(el.sample) !== normalizeText(state.text)) {
+                el.sample.textContent = state.text;
+            }
+
+            el.sample.classList.toggle("guides", !!state.guides);
+            el.gridWrap.style.display = state.grid ? "" : "none";
+
+            updateLabels(state);
+
+            if (options.save) {
+                saveSettings(state);
+            }
+        }
+
+        function readControlsBase() {
+            return {
+                size: clamp(parseInt(el.size.value, 10) || defaults.size, 1, 999),
+                wght: clamp(parseInt(el.wght.value, 10) || defaults.wght, 1, 1000),
+                line: clamp(parseFloat(el.line.value) || defaults.line, 0.5, 3.0),
+                track: clamp(parseFloat(el.track.value) || 0, -1, 2),
+                pad: clamp(parseInt(el.pad.value, 10) || 0, 0, 200),
+                fg: el.fg.value || defaults.fg,
+                bg: el.bg.value || defaults.bg,
+                liga: el.liga.checked,
+                kern: el.kern.checked,
+                guides: el.guides.checked,
+                grid: el.grid.checked,
+                baseline: clamp(parseFloat(el.baseline.value) || defaults.baseline, 0, 2),
+                cap: clamp(parseFloat(el.cap.value) || defaults.cap, 0, 2),
+                xh: clamp(parseFloat(el.xh.value) || defaults.xh, 0, 2),
+            };
+        }
+
+        function nextStateFromControls(extra = {}) {
+            return {
+                ...state,
+                ...readControlsBase(),
+                ...extra,
+            };
+        }
+
+        function formatCodepoint(cp) {
+            return "U+" + cp.toString(16).toUpperCase().padStart(cp <= 0xFFFF ? 4 : 6, "0");
+        }
+
+        function visibleGlyph(ch, cp) {
+            if (cp === 0x20) return "␠";
+            if (cp === 0x00A0) return "⍽";
+            if (cp === 0x09) return "⇥";
+            if (cp === 0x0A) return "↵";
+            if ((cp >= 0 && cp < 0x20) || (cp >= 0x7F && cp <= 0x9F)) return "·";
+            return ch;
+        }
+
+        function buildGlyphGridFromCodepoints(codepoints, meta = {}) {
+            const cps = Array.from(new Set(codepoints))
+                .filter(cp => Number.isInteger(cp) && cp >= 0 && cp <= 0x10FFFF)
+                .sort((a, b) => a - b);
+
+            el.glyphGrid.innerHTML = "";
+
+            for (const cp of cps) {
+                let ch;
+                try {
+                    ch = String.fromCodePoint(cp);
+                } catch {
+                    continue;
+                }
+
+                const cell = document.createElement("div");
+                cell.className = "gcell";
+                cell.title = formatCodepoint(cp);
+
+                const c = document.createElement("div");
+                c.className = "ch";
+                c.textContent = visibleGlyph(ch, cp);
+
+                const lab = document.createElement("div");
+                lab.className = "lab";
+                lab.textContent = formatCodepoint(cp);
+
+                cell.appendChild(c);
+                cell.appendChild(lab);
+                el.glyphGrid.appendChild(cell);
+            }
+
+            const bits = [];
+            bits.push(`${cps.length} code point${cps.length === 1 ? "" : "s"}`);
+            if (meta.path) bits.push(meta.path);
+            if (meta.truncated) bits.push("truncated");
+            el.glyphGridTitle.textContent = `Glyph quick look (${bits.join(" • ")})`;
+        }
+
+        function buildFallbackGlyphGrid() {
+            const fallback = Array.from("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+                .map(ch => ch.codePointAt(0));
+            buildGlyphGridFromCodepoints(fallback, { path: "fallback set" });
+        }
+
+        function parseHexish(value) {
+            if (typeof value === "number" && Number.isFinite(value)) {
+                return value;
+            }
+
+            const s = String(value ?? "").trim().toUpperCase();
+            if (!s) return null;
+
+            const m = s.match(/^(?:U\+|0X)?([0-9A-F]{1,6})$/);
+            if (!m) return null;
+
+            const n = parseInt(m[1], 16);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function extractUnicodeRangeItems(raw) {
+            if (raw == null) return [];
+
+            if (typeof raw === "string") {
+                return raw
+                    .split(",")
+                    .map(s => s.trim())
+                    .filter(Boolean);
+            }
+
+            if (typeof raw === "number") {
+                return [raw];
+            }
+
+            if (Array.isArray(raw)) {
+                return raw.flatMap(extractUnicodeRangeItems);
+            }
+
+            if (typeof raw === "object") {
+                if ("start" in raw || "end" in raw || "from" in raw || "to" in raw || "min" in raw || "max" in raw) {
+                    return [raw];
+                }
+            }
+
+            return [];
+        }
+
+        function parseUnicodeRangeItem(item) {
+            if (typeof item === "number") {
+                return [item, item];
+            }
+
+            if (typeof item === "object" && item) {
+                const start = parseHexish(item.start ?? item.from ?? item.min ?? item.first);
+                const end = parseHexish(item.end ?? item.to ?? item.max ?? item.last ?? item.start ?? item.from ?? item.min ?? item.first);
+                if (start == null || end == null) return null;
+                return [Math.min(start, end), Math.max(start, end)];
+            }
+
+            const token = String(item ?? "").trim().toUpperCase().replace(/\s+/g, "");
+            if (!token) return null;
+
+            const m = token.match(/^(?:U\+|0X)?([0-9A-F]{1,6})(?:-(?:U\+|0X)?([0-9A-F]{1,6}))?$/);
+            if (!m) return null;
+
+            const a = parseInt(m[1], 16);
+            const b = m[2] ? parseInt(m[2], 16) : a;
+            return [Math.min(a, b), Math.max(a, b)];
+        }
+
+        function findUnicodeRanges(manifest) {
+            const candidates = [
+                manifest?.unicodeRanges,
+                manifest?.meta?.unicodeRanges,
+                manifest?.font?.unicodeRanges,
+                manifest?.fontInfo?.unicodeRanges,
+            ];
+
+            for (const candidate of candidates) {
+                const items = extractUnicodeRangeItems(candidate);
+                if (items.length) return items;
+            }
+
+            return [];
+        }
+
+        function expandRangesToCodepoints(rangeItems, limit = 10000) {
+            const out = [];
+            const seen = new Set();
+            let truncated = false;
+
+            for (const item of rangeItems) {
+                const parsed = parseUnicodeRangeItem(item);
+                if (!parsed) continue;
+
+                const [start, end] = parsed;
+
+                for (let cp = start; cp <= end; cp++) {
+                    if (cp > 0x10FFFF) break;
+                    if (cp >= 0xD800 && cp <= 0xDFFF) continue;
+                    if (!seen.has(cp)) {
+                        seen.add(cp);
+                        out.push(cp);
+                        if (out.length >= limit) {
+                            truncated = true;
+                            return { codepoints: out, truncated };
+                        }
+                    }
+                }
+            }
+
+            return { codepoints: out, truncated };
+        }
+
+        async function loadManifestGlyphs() {
+            const candidates = [
+                "data/manifest.json",
+                "../data/manifest.json",
+                "./data/manifest.json",
+                "/data/manifest.json",
+            ];
+
+            for (const path of candidates) {
+                try {
+                    const res = await fetch(path, { cache: "no-store" });
+                    if (!res.ok) continue;
+
+                    const manifest = await res.json();
+                    const rangeItems = findUnicodeRanges(manifest);
+                    if (!rangeItems.length) {
+                        throw new Error("No unicodeRanges found");
+                    }
+
+                    const { codepoints, truncated } = expandRangesToCodepoints(rangeItems, 10000);
+                    if (!codepoints.length) {
+                        throw new Error("unicodeRanges could not be expanded");
+                    }
+
+                    buildGlyphGridFromCodepoints(codepoints, { path, truncated });
+                    manifestStatusText = `Manifest loaded ✔ (${codepoints.length}${truncated ? "+" : ""} chars from ${path})`;
+                    updateStatus();
+                    return;
+                } catch {
+                    // try next candidate
+                }
+            }
+
+            buildFallbackGlyphGrid();
+            manifestStatusText = "Manifest not loaded (using fallback grid)";
+            updateStatus();
+        }
+
+        function bind() {
+            const onControlChange = () => {
+                apply(nextStateFromControls({ text: normalizeText(el.text.value) }));
+            };
+
+            ["input", "change"].forEach(evt => {
+                el.size.addEventListener(evt, onControlChange);
+                el.wght.addEventListener(evt, onControlChange);
+                el.line.addEventListener(evt, onControlChange);
+                el.track.addEventListener(evt, onControlChange);
+                el.pad.addEventListener(evt, onControlChange);
+                el.fg.addEventListener(evt, onControlChange);
+                el.bg.addEventListener(evt, onControlChange);
+                el.liga.addEventListener(evt, onControlChange);
+                el.kern.addEventListener(evt, onControlChange);
+                el.guides.addEventListener(evt, onControlChange);
+                el.grid.addEventListener(evt, onControlChange);
+                el.baseline.addEventListener(evt, onControlChange);
+                el.cap.addEventListener(evt, onControlChange);
+                el.xh.addEventListener(evt, onControlChange);
+            });
+
+            el.text.addEventListener("input", () => {
+                apply(nextStateFromControls({ text: normalizeText(el.text.value) }), { syncSample: true });
+            });
+
+            el.sample.addEventListener("input", () => {
+                apply(nextStateFromControls({ text: getEditableText(el.sample) }), { syncSample: false, syncTextarea: true });
+            });
+
+            document.querySelectorAll("button[data-preset]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const key = btn.getAttribute("data-preset");
+                    if (!key || !presets[key]) return;
+                    apply(nextStateFromControls({ text: presets[key] }));
+                });
+            });
+
+            el.themeBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const theme = btn.dataset.themeMode || "device";
+                    apply({ ...state, theme });
+                });
+            });
+
+            el.resetBtn.addEventListener("click", () => {
+                apply({ ...defaults });
+            });
+
+            el.copyCssBtn.addEventListener("click", async () => {
+                const css = [
+                    `font-family: "Ligatureluurs", sans-serif;`,
+                    `font-size: ${state.size}px;`,
+                    `font-weight: ${state.wght};`,
+                    `font-variation-settings: "wght" ${state.wght};`,
+                    `line-height: ${state.line.toFixed(2)};`,
+                    `letter-spacing: ${state.track.toFixed(3)}em;`,
+                    `font-feature-settings: "liga" ${state.liga ? 1 : 0}, "kern" ${state.kern ? 1 : 0};`,
+                    `color: ${state.fg};`,
+                ].join("\n");
+
+                try {
+                    await navigator.clipboard.writeText(css);
+                    el.copyCssBtn.textContent = "Copied!";
+                    setTimeout(() => {
+                        el.copyCssBtn.textContent = "Copy CSS";
+                    }, 1000);
+                } catch {
+                    alert("Could not copy to clipboard.");
+                }
+            });
+        }
+
+        async function fontStatus() {
+            try {
+                await document.fonts.load('16px "Ligatureluurs"');
+                const ok = document.fonts.check('16px "Ligatureluurs"');
+                fontStatusText = ok
+                    ? "Font loaded ✔"
+                    : "Font not loaded (check paths / use a local server)";
+            } catch {
+                fontStatusText = "Font status unknown";
+            }
+            updateStatus();
+        }
+
+        updateStatus();
+        buildFallbackGlyphGrid();
+        bind();
+        apply(state);
+        fontStatus();
+        loadManifestGlyphs();
+    })();
+</script>
+</body>
+</html>
