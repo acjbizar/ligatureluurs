@@ -1002,34 +1002,36 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
 
     glyphs["c"] = (pen.ellipse_arc(bcX, bcY, rx, ry, 45.0, 315.0, steps=240), W)
 
-    a_p0 = (146.0, 400.0)
+    # a ----------------------------------------------------------------
+    # Wider bowl, smoother shoulder, slightly calmer top rhythm.
+    a_p0 = (136.0, 402.0)
 
-    a_c01 = (205.0, 320.0)
-    a_c02 = (265.0, 310.0)
-    a_p1 = (312.0, 315.0)
+    a_c01 = (198.0, 314.0)
+    a_c02 = (278.0, 302.0)
+    a_p1 = (326.0, 310.0)
 
-    a_c11 = (345.0, 318.0)
-    a_c12 = (360.0, 335.0)
-    a_p2 = (360.0, 360.0)
+    a_c11 = (354.0, 313.0)
+    a_c12 = (372.0, 332.0)
+    a_p2 = (372.0, 360.0)
 
     seg0 = cubic_points(a_p0, a_c01, a_c02, a_p1, steps=50)
     seg1 = cubic_points(a_p1, a_c11, a_c12, a_p2, steps=30)
 
-    stem_down = [(360.0, 770.0)]
-    bottom_in = [(256.0, 770.0)]
+    stem_down = [(372.0, 770.0)]
+    bottom_in = [(262.0, 770.0)]
 
-    a_p3 = (146.0, 665.0)
-    a_c21 = (195.25, 770.0)
-    a_c22 = (146.0, 723.0)
+    a_p3 = (136.0, 666.0)
+    a_c21 = (194.0, 770.0)
+    a_c22 = (136.0, 720.0)
 
-    a_p4 = (256.0, 560.0)
-    a_c31 = (146.0, 607.0)
-    a_c32 = (195.25, 560.0)
+    a_p4 = (262.0, 560.0)
+    a_c31 = (136.0, 610.0)
+    a_c32 = (198.0, 560.0)
 
     seg2 = cubic_points(bottom_in[-1], a_c21, a_c22, a_p3, steps=35)
     seg3 = cubic_points(a_p3, a_c31, a_c32, a_p4, steps=35)
 
-    bar_out = [(360.0, 560.0)]
+    bar_out = [(372.0, 560.0)]
 
     a_pts = (
         seg0 +
@@ -1062,17 +1064,19 @@ def build_lowercase(m: Metrics, pen: Mono) -> Dict[str, Tuple[Geom, float]]:
         bowl_rx=d_rx, overlap=10.0,
     ), W)
 
-    e_cx, e_cy = bcX, bcY
-    e_rx, e_ry = rx, ry
-    e_bar_y = yXTop + 180.0
+    # e ----------------------------------------------------------------
+    # Slightly larger and fuller, with a firmer crossbar and less weak aperture.
+    e_cx, e_cy = bcX + 4.0, bcY
+    e_rx, e_ry = rx * 1.08, ry * 1.04
+    e_bar_y = yXTop + 168.0
 
     s = (e_bar_y - e_cy) / e_ry
     s = clamp(s, -1.0, 1.0)
     a_start = math.degrees(math.asin(s)) % 360.0
-    a_end = 70.0
+    a_end = 60.0
 
     bar_end = ellipse_point(e_cx, e_cy, e_rx, e_ry, a_start)
-    bar_start = (e_cx - e_rx * 0.56, e_bar_y)
+    bar_start = (e_cx - e_rx * 0.67, e_bar_y)
 
     arc_pts = ellipse_arc_points(
         e_cx, e_cy, e_rx, e_ry,
